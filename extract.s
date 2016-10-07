@@ -39,8 +39,8 @@ exit:
     mov     rsp, rbp
     pop     rbp
 
-    mov     eax, 60
-    xor     rdi, rdi
+    mov     rax, 60             ; sys_exit
+    xor     rdi, rdi            ; err
     syscall
 
 str:     db "Hello world",10,0
