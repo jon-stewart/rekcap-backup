@@ -20,7 +20,7 @@ def elf_hdr(entry):
     ei_abiver   = 0
     ei_pad      = "".encode("UTF-8")
     e_type      = 2
-    e_machine   = 3
+    e_machine   = 0x3e
     e_version   = 1
     e_entry     = entry
     e_phoff     = 64
@@ -68,10 +68,10 @@ def elf_phdr(offset, va, size):
     p_type   = 1
     p_offset = offset
     p_vaddr  = va
-    p_paddr  = 0
+    p_paddr  = va
     p_filesz = size
     p_memsz  = size
-    p_flags  = 0x7
+    p_flags  = 0x5
     p_align  = 0x200000
 
     phdr = struct.pack(fmt,
@@ -87,11 +87,27 @@ def elf_phdr(offset, va, size):
     return (phdr)
 
 
-padding = struct.pack("200s", "".encode("UTF-8"))
-data = elf_hdr(0xabcd) + elf_phdr(0x40 + 0x38, 0x400000, 20) + padding
+def stub():
+    '''
+    '''
 
-# stub phdr
-# data phdr
+    data = None
+
+    with open("extract", "rb") as fp:
+        data = fp.read()
+
+    return (data)
+
+
+padding = struct.pack("200s", "".encode("UTF-8"))
+
+data = elf_hdr(0x400000 + 64 + 56)
+
+data += elf_phdr(0, 0x400000, 0xf0)
+
+data += stub()
+
+data += padding
 
 with open("lol", "wb") as fp:
     fp.write(data)
