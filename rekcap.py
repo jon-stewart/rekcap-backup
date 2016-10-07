@@ -4,9 +4,9 @@ from elf import Elf
 
 elf = Elf()
 
-data = elf.ehdr(0x400000 + 64 + 56)
+data = elf.ehdr(0x600000 + 64 + 56)
 
-data += elf.phdr(0, 0x400000, 0xf0)
+data += elf.phdr(0, 0x600000, 0xf0)
 
 with open("extract", "rb") as fp:
     stub_data = fp.read()
