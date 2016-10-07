@@ -20,7 +20,7 @@ global _start
 _start:
     push    rbp
     mov     rbp, rsp
-    sub     rsp, 4
+    sub     rsp, 8
     call    delta
 
 delta:
