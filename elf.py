@@ -123,9 +123,6 @@ class Elf():
 
         self.ehdr.e_phnum += 1
 
-        if (offset == 0):
-            self.ehdr.e_entry = (va + 64 + (len(self.seg_list) * 56))
-
 
     def padding(self, sz):
         '''
