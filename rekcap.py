@@ -2,18 +2,17 @@
 
 from elf import Elf
 
-elf = Elf()
-
-data = elf.ehdr(0x600000 + 64 + 56)
-
-data += elf.phdr(0, 0x600000, 0xf0)
-
 with open("extract", "rb") as fp:
     stub_data = fp.read()
 
-data += stub_data
+elf = Elf()
 
-data += elf.padding(200)
+elf.create_ehdr()
 
-with open("poc.elf", "wb") as fp:
-    fp.write(data)
+elf.create_phdr(0, 0x800000, 0xf0, stub_data)
+
+elf.padding(200)
+
+elf.create_binary()
+
+elf.dump_binary("poc.elf")
