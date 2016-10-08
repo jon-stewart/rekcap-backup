@@ -14,3 +14,11 @@ Next:
  * mmap(exec|write) to 0x400000
  * XOR original elf from .data segment into 0x400000
  * Userland exec
+
+
+AUXV
+
+    AT_PHDR  : 3
+    AT_PHENT : 4
+    AT_PHNUM : 5
+    AT_ENTRY : 9
