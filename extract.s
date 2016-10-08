@@ -36,14 +36,17 @@
 [BITS 64]
 
 ; stack
-; [rbp-0x8] : base address
+; [rbp-0x8]  : base address
+; [rbp-0x10] : phdr vaddr
+; [rbp-0x18] : phdr size
+; [rbp-0x20] : phdr number
 
 global _start
 
 _start:
-    push    rbp
+    push    rbp                 ; TODO this is NULL, should use differently
     mov     rbp, rsp
-    sub     rsp, 8
+    sub     rsp, 0x20
     call    delta
 
 delta:
@@ -51,7 +54,42 @@ delta:
     sub     rax, delta
     mov     [rbp-8], rax
 
-    print [rbp-8], str, str_sz
+    print   [rbp-8], msg_start, msg_start_sz
+
+    ; the search for auxv
+    mov     rsi, rsp
+    add     rsi, 0x48           ; need to move past stack frame, argc and argv
+find_auxv:
+    add     rsi, 8
+    mov     rax, [rsi]
+    test    rax, rax
+    jne     find_auxv
+
+    ; found auxv
+
+    ; AT_PHDR  (3)
+    mov     rax, [rsi + 0x48]
+    cmp     rax, 3
+    jne     exit                ; verify
+    mov     rax, [rsi + 0x50]
+    mov     [rbp-0x10], rax
+
+    ; AT_PHENT (4)
+    mov     rax, [rsi + 0x58]
+    cmp     rax, 4              ; verify
+    jne     exit
+    mov     rax, [rsi + 0x60]
+    mov     [rbp-0x18], rax
+
+    ; AT_PHNUM (5)
+    mov     rax, [rsi + 0x68]
+    cmp     rax, 5              ; verify
+    jne     exit
+    mov     rax, [rsi + 0x70]
+    mov     [rbp-0x20], rax
+
+
+    print   [rbp-8], msg_end, msg_end_sz
 
 exit:
     mov     rsp, rbp
@@ -61,5 +99,8 @@ exit:
     xor     rdi, rdi            ; err
     syscall
 
-str:     db "start",10,0
-str_sz:  equ $-str
+msg_start:      db "start",10,0
+msg_start_sz:   equ $-msg_start
+
+msg_end:        db "end",10,0
+msg_end_sz:     equ $-msg_end
