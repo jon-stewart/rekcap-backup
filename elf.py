@@ -99,25 +99,16 @@ class Elf():
         self.ehdr = Ehdr()
 
 
-    def create_phdr(self, offset, va, sz, segment):
+    def create_phdr(self, va, flags, segment):
         '''
         p_type  : PT_LOAD (1)
         p_flags : (exec (1) | write (2) | read (4))
-
-        First PT_LOAD segment must contain ehdr and phdrs (offset=0)
         '''
-        if (len(self.seg_list) == 0) and (offset != 0):
-            print("[!] First segment must have zero offset.")
-            return
-
         phdr = Phdr()
 
-        phdr.p_offset = offset
         phdr.p_vaddr  = va
         phdr.p_paddr  = va
-        phdr.p_filesz = sz
-        phdr.p_memsz  = sz
-        phdr.p_flags  = 0x5
+        phdr.p_flags  = flags
 
         self.seg_list.append((phdr, segment))
 
@@ -141,17 +132,36 @@ class Elf():
         self.ehdr.e_entry = (phdr.p_vaddr + self.ehdr.e_ehsize + (self.ehdr.e_phnum * self.ehdr.e_phentsize))
 
 
+    def set_phdr_layout(self):
+        '''
+        '''
+        offset = 0
+        size   = 0
+
+        for (phdr, segment) in self.seg_list:
+            if not offset:
+                size = (self.ehdr.e_ehsize + (self.ehdr.e_phnum * self.ehdr.e_phentsize) + len(segment))
+            else:
+                offset += size
+                size    = len(segment)
+
+            phdr.p_offset = offset
+            phdr.p_filesz = size
+            phdr.p_memsz  = size
+
+
     def create_binary(self):
         '''
         '''
         self.set_entry_point()
+
+        self.set_phdr_layout()
 
         self.raw = self.ehdr.pack()
 
         for (phdr, _) in self.seg_list:
             self.raw += phdr.pack()
 
-        # TODO any way to ensure correct offset?
         for (_, segment) in self.seg_list:
             self.raw += segment
 

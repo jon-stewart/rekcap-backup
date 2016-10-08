@@ -40,11 +40,9 @@ elf = Elf()
 
 elf.create_ehdr()
 
-# TODO auto generate offset/size
-elf.create_phdr(0, 0x800000, 0xf0, extract_stub)
+elf.create_phdr(0x800000, 5, extract_stub)
 
-# TODO what offset?
-#elf.create_phdr(0, 0x400000, len(binary), binary)
+elf.create_phdr(0x400000, 6, binary)
 
 elf.padding(200)
 
