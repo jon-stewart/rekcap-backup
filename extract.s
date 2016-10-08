@@ -1,12 +1,35 @@
 ;------------------------------------------------------------------------------
 ; Name:
+;   print
+;
+; Description:
+;   Write string to stdout
+;
+; In:
+;   1-base address
+;   2-string offset
+;   3-string length
+;
+%macro print 3
+    mov     rax, 1          ; sys_write
+    mov     rdi, 1          ; stdout
+    mov     rdx, %1
+    lea     rsi, [rdx + %2] ; buf
+    mov     rdx, %3         ; count
+    syscall
+%endmacro
+
+;------------------------------------------------------------------------------
+; Name:
 ;   extract
 ;
 ; Description:
 ;   Stub of code placed along side packed elf executable.
 ;
-;   Elf hdr e_entry should point to this code, it will then unpack original
-;   executable into memory.
+;   - Traverse stack to find program header info from AUXV
+;   - mmap 0x400000 size of packed elf
+;   - xor 0x90 .data segment into 0x400000
+;   - userland exec
 ;
 [section .text]
 
@@ -28,12 +51,7 @@ delta:
     sub     rax, delta
     mov     [rbp-8], rax
 
-    mov     rax, 1              ; sys_write
-    mov     rdi, 1              ; stdout
-    mov     rdx, [rbp-8]
-    lea     rsi, [rdx + str]    ; buf
-    mov     rdx, str_sz         ; count
-    syscall
+    print [rbp-8], str, str_sz
 
 exit:
     mov     rsp, rbp
@@ -43,5 +61,5 @@ exit:
     xor     rdi, rdi            ; err
     syscall
 
-str:     db "Hello world",10,0
+str:     db "start",10,0
 str_sz:  equ $-str
