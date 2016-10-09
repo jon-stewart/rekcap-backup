@@ -27,13 +27,20 @@
 ;   Stub of code placed along side packed elf executable.
 ;
 ;   - Traverse stack to find program header info from AUXV
-;   - mmap 0x400000 size of packed elf
-;   - xor 0x90 .data segment into 0x400000
+;   - mmap unpack location, size of packed elf
+;   - xor segment into unpack location
+;   - munmap segment
 ;   - userland exec
 ;
 [section .text]
 
 [BITS 64]
+
+; Address to unpack the original elf file
+%define ELF_SCRATCHPAD      0x2000000
+
+; Address to read in interpreter
+%define INTERP_SCRATCHPAD   0x4000000
 
 ; stack
 ; [rbp-0x8]  : base address
@@ -42,8 +49,6 @@
 ; [rbp-0x20] : phdr number
 ; [rbp-0x28] : p_vaddr (xor'd elf address)
 ; [rbp-0x30] : p_memsz (xor'd elf size)
-
-%define UNPACK_ADDR 0x400000
 
 global _start
 
@@ -85,21 +90,25 @@ delta:
     mov     [rbp-0x30], rbx         ; p_memsz
 
     ; mmap
-    mov     rdi, UNPACK_ADDR        ; addr
+    mov     rdi, ELF_SCRATCHPAD     ; addr
     mov     rsi, [rbp-0x30]         ; len
     call    mmap
 
     ; copy and xor original elf into mapped region
-    mov     rdi, UNPACK_ADDR        ; dst
+    mov     rdi, ELF_SCRATCHPAD     ; dst
     mov     rsi, [rbp-0x28]         ; src
     mov     rdx, [rbp-0x30]         ; count
     mov     r8, 0x90                ; xor value
     call    xor_copy
 
-    ; munmap
-    mov     rdi, UNPACK_ADDR        ; addr
+    mov     rdi, ELF_SCRATCHPAD
+    call    userland_exec
+
+    ; munmap the scratch pad
+    mov     rdi, ELF_SCRATCHPAD     ; addr
     mov     rsi, [rbp-0x30]         ; len
     call    munmap
+
 
     print   [rbp-8], msg_end, msg_end_sz
 
@@ -321,4 +330,36 @@ xor_copy:
     test    rcx, rcx
     jnz     .loop
 
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   userland_exec
+;
+; Description:
+;   Traverse elf headers and find the PT_INTERP and PT_LOAD phdrs.
+;
+;   For each PT_LOAD: mmap.
+;
+;   Read in interpreter to the interp scratch pad.  For each PT_LOAD: mmap.
+;
+;   Munmap the interp scratch pad.
+;
+;   Change values of the AUXV on stack to reflect new elf.
+;
+;   Return interpeter e_entry point.  Caller must cleanup stack frame and
+;   scratchpads and jump to this address.
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-base address of elf scratch pad
+;
+; Out:
+;   rax-interpreter e_entry point
+;
+; Modifies:
+;
+userland_exec:
     ret
