@@ -77,35 +77,24 @@ delta:
     mov     [rbp-0x20], rax
 
 
-    ; find data phdr.  This is 2nd.
-    mov     rsi, [rbp-0x10]         ; phdr array offset
-    add     rsi, [rbp-0x18]         ; address of 2nd phdr
-
-    mov     rax, [rsi + 0x10]       ; p_vaddr
-    mov     [rbp-0x28], rax
-    mov     rax, [rsi + 0x28]       ; p_memsz
-    mov     [rbp-0x30], rax
+    ; find vaddr and size of .data segment
+    mov     rdi, [rbp-0x10]
+    mov     rsi, [rbp-0x18]
+    call    get_phdr_info
+    mov     [rbp-0x28], rax         ; p_vaddr
+    mov     [rbp-0x30], rbx         ; p_memsz
 
     ; mmap
     mov     rdi, UNPACK_ADDR        ; addr
     mov     rsi, [rbp-0x30]         ; len
     call    mmap
 
-    ; machine gun move into mapped memory
-    mov     rsi, [rbp-0x28]         ; src : xor'd elf
-    mov     rdi, UNPACK_ADDR        ; dst : mmaped region
-    mov     rcx, [rbp-0x30]         ; count
-    jmp     begin
-loop:
-    add     rsi, 1
-    add     rdi, 1
-begin:
-    mov     al, [rsi]
-    xor     al, 0x90
-    mov     [rdi], al
-    dec     rcx
-    test    rcx, rcx
-    jne loop
+    ; copy and xor original elf into mapped region
+    mov     rdi, UNPACK_ADDR        ; dst
+    mov     rsi, [rbp-0x28]         ; src
+    mov     rdx, [rbp-0x30]         ; count
+    mov     r8, 0x90                ; xor value
+    call    xor_copy
 
     ; munmap
     mov     rdi, UNPACK_ADDR        ; addr
@@ -204,6 +193,35 @@ get_auxv_val:
 
 ;------------------------------------------------------------------------------
 ; Name:
+;   get_phdr_info
+;
+; Description:
+;   Load address of 2nd phdr and return p_vaddr and p_memsz.
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-phdr start address
+;   rsi-size of phdr entry
+;
+; Out:
+;   rax-p_vaddr
+;   rbx-p_memsz
+;
+; Modifies:
+;   rax
+;   rbx
+;   r8
+get_phdr_info:
+	lea     r8,  [rdi + rsi]
+	mov		rax, [r8 + 0x10]
+	mov		rbx, [r8 + 0x28]
+
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
 ;   mmap
 ;
 ; Description:
@@ -259,5 +277,48 @@ mmap:
 munmap:
     mov     rax, 0xb                ; sys_munmap
     syscall
+
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   xor_copy
+;
+; Description:
+;   for i bytes in count:
+;       dst[i] = (src[i] ^ xor_val)
+;
+;   xor value must be <255
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-dst
+;   rsi-src
+;   rdx-len
+;   r8 -xor value
+;
+; Out:
+;   -
+;
+; Modifies:
+;   rax
+;   rcx
+;
+xor_copy:
+    mov     rcx, rdx
+    mov     rdx, r8
+    jmp     .begin
+.loop:
+    add     rsi, 1
+    add     rdi, 1
+.begin:
+    mov     al, [rsi]
+    xor     al, dl
+    mov     [rdi], al
+    dec     rcx
+    test    rcx, rcx
+    jne     .loop
 
     ret
