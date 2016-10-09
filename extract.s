@@ -40,6 +40,8 @@
 ; [rbp-0x10] : phdr vaddr
 ; [rbp-0x18] : phdr size
 ; [rbp-0x20] : phdr number
+; [rbp-0x28] : p_vaddr (xor'd elf address)
+; [rbp-0x30] : p_memsz (xor'd elf size)
 
 %define UNPACK_ADDR 0x400000
 
@@ -47,7 +49,7 @@ global _start
 
 _start:
     mov     rbp, rsp                ; rbp is NULL - nothing to push to stack
-    sub     rsp, 0x20
+    sub     rsp, 0x30
     call    delta
 
 delta:
@@ -79,24 +81,20 @@ delta:
     mov     rsi, [rbp-0x10]         ; phdr array offset
     add     rsi, [rbp-0x18]         ; address of 2nd phdr
 
-    mov     rbx, [rsi + 0x10]       ; p_vaddr
-    mov     rcx, [rsi + 0x28]       ; p_memsz
+    mov     rax, [rsi + 0x10]       ; p_vaddr
+    mov     [rbp-0x28], rax
+    mov     rax, [rsi + 0x28]       ; p_memsz
+    mov     [rbp-0x30], rax
 
     ; mmap
-    mov     rax, 9                  ; sys_mmap
     mov     rdi, UNPACK_ADDR        ; addr
-    mov     rsi, rcx                ; len
-    mov     rdx, 7                  ; prot  (RWE)
-    mov     r10, 0x22               ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
-    xor     r8, r8                  ; fd    (ignored)
-    xor     r9, r9                  ; off   (ignored)
-    syscall
+    mov     rsi, [rbp-0x30]         ; len
+    call    mmap
 
     ; munmap
-    mov     rax, 0xb                ; sys_munmap
     mov     rdi, UNPACK_ADDR        ; addr
-    mov     rsi, rcx                ; len
-    syscall
+    mov     rsi, [rbp-0x30]         ; len
+    call    munmap
 
     print   [rbp-8], msg_end, msg_end_sz
 
@@ -186,4 +184,64 @@ get_auxv_val:
 
     add     rcx, 8                  ; move to value
     mov     rax, [rdi + rcx]
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   mmap
+;
+; Description:
+;   Setup and make sys_mmap call
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-address
+;   rsi-length
+;
+; Out:
+;   rax-error
+;
+; Modifies:
+;   rax
+;   rdx
+;   r10
+;   r8
+;   r9
+;
+mmap:
+    mov     rax, 9                  ; sys_mmap
+    mov     rdx, 7                  ; prot  (RWE)
+    mov     r10, 0x22               ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
+    xor     r8, r8                  ; fd    (ignored)
+    xor     r9, r9                  ; off   (ignored)
+    syscall
+
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   munmap
+;
+; Description:
+;   Setup and make sys_munmap call
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-address
+;   rsi-length
+;
+; Out:
+;   rax-error
+;
+; Modifies:
+;   rax
+;
+munmap:
+    mov     rax, 0xb                ; sys_munmap
+    syscall
+
     ret
