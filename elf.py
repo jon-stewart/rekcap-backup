@@ -134,6 +134,7 @@ class Elf():
 
     def set_phdr_layout(self):
         '''
+        .data segment must start full 0x200000 bytes from .text segment
         '''
         offset = 0
         size   = 0
@@ -145,10 +146,12 @@ class Elf():
                 size = len(segment)
 
             phdr.p_offset = offset
+            phdr.p_vaddr += offset
             phdr.p_filesz = size
             phdr.p_memsz  = size
 
             offset += size
+
 
 
     def create_binary(self):
