@@ -8,7 +8,7 @@ Packing:
     * Add single program header which will load whole binary into memory
     * Shove in some compiled position independent assembly and set p_entry
     * Provide random elf and XOR it into RW segment
-    * Correctly set offsets and sizes
+    * Correctly set offsets and sizes (must be 0x200000 between PT_LOAD segments)
 
 
 Unpacking:
