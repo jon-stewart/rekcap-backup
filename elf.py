@@ -139,15 +139,16 @@ class Elf():
         size   = 0
 
         for (phdr, segment) in self.seg_list:
-            if not offset:
+            if offset == 0:
                 size = (self.ehdr.e_ehsize + (self.ehdr.e_phnum * self.ehdr.e_phentsize) + len(segment))
             else:
-                offset += size
-                size    = len(segment)
+                size = len(segment)
 
             phdr.p_offset = offset
             phdr.p_filesz = size
             phdr.p_memsz  = size
+
+            offset += size
 
 
     def create_binary(self):
