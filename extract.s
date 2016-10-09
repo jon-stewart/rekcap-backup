@@ -78,8 +78,8 @@ delta:
 
 
     ; find vaddr and size of .data segment
-    mov     rdi, [rbp-0x10]
-    mov     rsi, [rbp-0x18]
+    mov     rdi, [rbp-0x10]         ; phdr address
+    mov     rsi, [rbp-0x18]         ; phdr entry size
     call    get_phdr_info
     mov     [rbp-0x28], rax         ; p_vaddr
     mov     [rbp-0x30], rbx         ; p_memsz
