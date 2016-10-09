@@ -11,11 +11,11 @@
 ;   3-string length
 ;
 %macro print 3
-    mov     rax, 1          ; sys_write
-    mov     rdi, 1          ; stdout
+    mov     rax, 1                  ; sys_write
+    mov     rdi, 1                  ; stdout
     mov     rdx, %1
-    lea     rsi, [rdx + %2] ; buf
-    mov     rdx, %3         ; count
+    lea     rsi, [rdx + %2]         ; buf
+    mov     rdx, %3                 ; count
     syscall
 %endmacro
 
@@ -46,7 +46,7 @@
 global _start
 
 _start:
-    mov     rbp, rsp            ; rbp is NULL - nothing to push to stack
+    mov     rbp, rsp                ; rbp is NULL - nothing to push to stack
     sub     rsp, 0x20
     call    delta
 
@@ -57,30 +57,30 @@ delta:
 
     print   [rbp-8], msg_start, msg_start_sz
 
-    mov     rdi, rbp            ; beyond stack frame
+    mov     rdi, rbp                ; beyond stack frame
     call    find_auxv
 
-    mov     rdi, rax            ; base address of auxv
+    mov     rdi, rax                ; base address of auxv
 
-    mov     rsi, 3              ; AT_PHDR
+    mov     rsi, 3                  ; AT_PHDR
     call    get_auxv_val
     mov     [rbp-0x10], rax
 
-    mov     rsi, 4              ; AT_PHENT
+    mov     rsi, 4                  ; AT_PHENT
     call    get_auxv_val
     mov     [rbp-0x18], rax
 
-    mov     rsi, 5              ; AT_PHNUM
+    mov     rsi, 5                  ; AT_PHNUM
     call    get_auxv_val
     mov     [rbp-0x20], rax
 
 
     ; find data phdr.  This is 2nd.
-    mov     rsi, [rbp-0x10]
-    add     rsi, [rbp-0x18]
+    mov     rsi, [rbp-0x10]         ; phdr array offset
+    add     rsi, [rbp-0x18]         ; address of 2nd phdr
 
-    mov     rbx, [rsi + 0x10]      ; p_vaddr
-    mov     rcx, [rsi + 0x28]      ; p_memsz
+    mov     rbx, [rsi + 0x10]       ; p_vaddr
+    mov     rcx, [rsi + 0x28]       ; p_memsz
 
     ; mmap
     mov     rax, 9                  ; sys_mmap
@@ -104,8 +104,8 @@ exit:
     mov     rsp, rbp
     pop     rbp
 
-    mov     rax, 60             ; sys_exit
-                                ; rdi:error code
+    mov     rax, 60                 ; sys_exit
+                                    ; rdi:error code
     syscall
 
 msg_start:      db "start",10,0
@@ -178,12 +178,12 @@ get_auxv_val:
     xor     rcx, rcx
     jmp     .begin
 .loop:
-    add     rcx, 0x10           ; move to next key
+    add     rcx, 0x10               ; move to next key
 .begin:
     mov     rax, [rdi + rcx]
     cmp     rax, rsi
     jne     .loop
 
-    add     rcx, 8              ; move to value
+    add     rcx, 8                  ; move to value
     mov     rax, [rdi + rcx]
     ret
