@@ -83,8 +83,9 @@ delta:
 
 
     ; find vaddr and size of .data segment
-    mov     rdi, [rbp-0x10]         ; phdr address
-    mov     rsi, [rbp-0x18]         ; phdr entry size
+    mov     rax, [rbp-0x10]         ; phdr address
+    mov     rbx, [rbp-0x18]         ; phdr entry size
+    lea     rdi, [rax + rbx]        ; 2nd phdr
     call    get_phdr_info
     mov     [rbp-0x28], rax         ; p_vaddr
     mov     [rbp-0x30], rbx         ; p_memsz
@@ -205,14 +206,13 @@ get_auxv_val:
 ;   get_phdr_info
 ;
 ; Description:
-;   Load address of 2nd phdr and return p_vaddr and p_memsz.
+;   return p_vaddr and p_memsz
 ;
 ; Stack:
 ;   Nothing
 ;
 ; In:
 ;   rdi-phdr start address
-;   rsi-size of phdr entry
 ;
 ; Out:
 ;   rax-p_vaddr
@@ -223,9 +223,8 @@ get_auxv_val:
 ;   rbx
 ;   r8
 get_phdr_info:
-	lea     r8,  [rdi + rsi]
-	mov		rax, [r8 + 0x10]
-	mov		rbx, [r8 + 0x28]
+	mov		rax, [rdi + 0x10]
+	mov		rbx, [rdi + 0x28]
 
     ret
 
@@ -351,7 +350,7 @@ xor_copy:
 ;   scratchpads and jump to this address.
 ;
 ; Stack:
-;   Nothing
+;   [rbp-0x8]  : base addr of elf
 ;
 ; In:
 ;   rdi-base address of elf scratch pad
@@ -362,4 +361,95 @@ xor_copy:
 ; Modifies:
 ;
 userland_exec:
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 0x8
+
+    mov     [rbp-0x8], rdi
+    mov     rax, rdi
+
+
+    mov     rbx, [rax + 0x20]       ; e_phoff
+    lea     rdi, [rax + rbx]        ; phdr array addr
+
+    xor     rbx, rbx
+    mov     bl, [rax + 0x36]        ; e_phent
+    mov     rsi, rbx
+
+    xor     rdx, rdx
+    mov     dl, [rax + 0x38]        ; e_phnum
+    call    load_elf
+
+
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   load_elf
+;
+; Description:
+;   Iterate through phdr and mmap in PT_LOAD segments
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-base addr of phdr array
+;   rsi-size of each phdr
+;   rdx-number of phdr
+;
+; Modifies:
+;   rax
+;   rbx
+;   rcx
+;   rdx
+;   rdi
+;   rsi
+;
+; Calls:
+;   get_phdr_info
+;   mmap
+;
+load_elf:
+    mov     rbx, rsi
+    mov     rsi, rdi
+    mov     rcx, rdx
+
+    xor     rax, rax
+
+    ; foreach phdr - if PT_LOAD : mmap
+    jmp     .begin
+.loop:
+    add     rsi, rbx                ; move to next phdr
+    dec     rcx
+
+    test    rcx, rcx
+    jz      .end
+
+.begin:
+    mov     eax, [rsi]              ; p_type
+    cmp     eax, 1                  ; PT_LOAD
+    jne     .loop
+
+    push    rbx
+
+    mov     rdi, rsi                ; phdr addr
+    call    get_phdr_info
+
+    push    rsi
+    push    rcx
+
+    mov     rdi, rax                ; p_vaddr
+    mov     rsi, rbx                ; p_memsz
+    call    mmap                    ; mmap
+
+    pop     rcx
+    pop     rsi
+    pop     rbx
+
+    jmp     .loop
+
+.end:
     ret
