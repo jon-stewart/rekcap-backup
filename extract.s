@@ -91,6 +91,12 @@ delta:
     mov     rsi, [rbp-0x30]         ; len
     call    mmap
 
+    ; machine gun move into mapped memory
+    mov     rsi, [rbp-0x28]         ; src : xor'd elf
+    mov     rdi, UNPACK_ADDR        ; dst : mmaped region
+    mov     rcx, [rbp-0x30]         ; count
+    rep     movsq
+
     ; munmap
     mov     rdi, UNPACK_ADDR        ; addr
     mov     rsi, [rbp-0x30]         ; len
