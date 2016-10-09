@@ -95,7 +95,17 @@ delta:
     mov     rsi, [rbp-0x28]         ; src : xor'd elf
     mov     rdi, UNPACK_ADDR        ; dst : mmaped region
     mov     rcx, [rbp-0x30]         ; count
-    rep     movsb
+    jmp     begin
+loop:
+    add     rsi, 1
+    add     rdi, 1
+begin:
+    mov     al, [rsi]
+    xor     al, 0x90
+    mov     [rdi], al
+    dec     rcx
+    test    rcx, rcx
+    jne loop
 
     ; munmap
     mov     rdi, UNPACK_ADDR        ; addr
