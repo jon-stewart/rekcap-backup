@@ -152,12 +152,12 @@ get_auxv_val:
     xor     rcx, rcx
     jmp     .begin
 .loop:
-    add     rcx, 0x10   ; move to next key
+    add     rcx, 0x10           ; move to next key
 .begin:
     mov     rax, [rdi + rcx]
     cmp     rax, rsi
     jne     .loop
 
-    add     rcx, 8
+    add     rcx, 8              ; move to value
     mov     rax, [rdi + rcx]
     ret
