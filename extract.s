@@ -95,7 +95,7 @@ delta:
     mov     rsi, [rbp-0x28]         ; src : xor'd elf
     mov     rdi, UNPACK_ADDR        ; dst : mmaped region
     mov     rcx, [rbp-0x30]         ; count
-    rep     movsq
+    rep     movsb
 
     ; munmap
     mov     rdi, UNPACK_ADDR        ; addr
