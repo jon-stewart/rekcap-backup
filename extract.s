@@ -350,7 +350,10 @@ xor_copy:
 ;   scratchpads and jump to this address.
 ;
 ; Stack:
-;   [rbp-0x8]  : base addr of elf
+;   [rbp-0x8]  : phdr addr
+;   [rbp-0x10] : phdr size
+;   [rbp-0x18] : number of phdr
+;   [rbp-0x20] : base of elf TODO tidy
 ;
 ; In:
 ;   rdi-base address of elf scratch pad
@@ -363,23 +366,33 @@ xor_copy:
 userland_exec:
     push    rbp
     mov     rbp, rsp
-    sub     rsp, 0x8
+    sub     rsp, 0x20
 
-    mov     [rbp-0x8], rdi
-    mov     rax, rdi
+    mov     [rbp-0x20], rdi
+
+    mov     rax, [rdi + 0x20]       ; e_phoff
+    lea     rbx, [rdi + rax]        ; phdr addr
+    mov     [rbp-0x8], rbx
+
+    xor     rax, rax
+    mov     al, [rdi + 0x36]        ; e_phent
+    mov     [rbp-0x10], rax
+
+    xor     rax, rax
+    mov     al, [rdi + 0x38]        ; e_phnum
+    mov     [rbp-0x18], rax
 
 
-    mov     rbx, [rax + 0x20]       ; e_phoff
-    lea     rdi, [rax + rbx]        ; phdr array addr
-
-    xor     rbx, rbx
-    mov     bl, [rax + 0x36]        ; e_phent
-    mov     rsi, rbx
-
-    xor     rdx, rdx
-    mov     dl, [rax + 0x38]        ; e_phnum
+    mov     rdi, [rbp-0x8]          ; phdr addr
+    mov     rsi, [rbp-0x10]         ; e_phent
+    mov     rdx, [rbp-0x18]         ; e_phnum
     call    load_elf
 
+    mov     rdi, [rbp-0x8]          ; phdr addr
+    mov     rsi, [rbp-0x10]         ; e_phent
+    mov     rdx, [rbp-0x18]         ; e_phnum
+    mov     r8,  [rbp-0x20]
+    call    load_interp
 
     mov     rsp, rbp
     pop     rbp
@@ -396,8 +409,8 @@ userland_exec:
 ;   Nothing
 ;
 ; In:
-;   rdi-base addr of phdr array
-;   rsi-size of each phdr
+;   rdi-phdr addr
+;   rsi-phdr size
 ;   rdx-number of phdr
 ;
 ; Modifies:
@@ -417,8 +430,6 @@ load_elf:
     mov     rsi, rdi
     mov     rcx, rdx
 
-    xor     rax, rax
-
     ; foreach phdr - if PT_LOAD : mmap
     jmp     .begin
 .loop:
@@ -429,6 +440,7 @@ load_elf:
     jz      .end
 
 .begin:
+    xor     rax, rax
     mov     eax, [rsi]              ; p_type
     cmp     eax, 1                  ; PT_LOAD
     jne     .loop
@@ -452,4 +464,61 @@ load_elf:
     jmp     .loop
 
 .end:
+    ret
+
+;------------------------------------------------------------------------------
+; TODO Assuming there always PT_INTERP for now
+;
+; In:
+;   rdi-phdr addr
+;   rsi-phdr size
+;   rdx-number of phdr
+;   r8 -base addr.. TODO tidy
+;
+load_interp:
+    push    rbp
+    mov     rbp, rsp
+
+
+    mov     rbx, rsi
+    mov     rsi, rdi
+    mov     rcx, rdx
+
+    jmp     .begin
+.loop:
+    add     rsi, rbx
+    dec     rcx
+
+    test    rcx, rcx
+    jz      .end
+.begin:
+    xor     rax, rax
+    mov     eax, [rsi]              ; p_type
+    cmp     eax, 3                  ; PT_INTERP
+    jne     .loop
+.end:
+
+    mov     rdx, [rsi + 0x8]        ; p_offset
+    mov     rbx, [rsi + 0x20]       ; p_filesz
+
+
+    sub     rsp, rbx                ; create space on stack
+
+    ; zero out
+    xor     rax, rax
+    mov     rdi, rsp
+    mov     rcx, rbx
+    rep     stosb
+
+    ; copy string into stack
+    mov     rdi, rsp
+    mov     rsi, r8
+    add     rsi, rdx
+    mov     rcx, rbx
+    rep     movsb
+
+
+
+    mov     rsp, rbp
+    pop     rbp
     ret
