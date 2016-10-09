@@ -518,6 +518,24 @@ load_interp:
     rep     movsb
 
 
+    ; TODO probably need to fstat the file to know size to read
+
+    mov     rdi, INTERP_SCRATCHPAD
+    mov     rsi, 0?
+    call    mmap
+
+    mov     rax, 2                  ; sys_open
+    mov     rdi, rsp                ; filename
+    mov     rsi, 0                  ; flags
+    mov     rdx, 0                  ; mode
+    syscall
+
+    mov     rax, 0                  ; sys_read
+    mov     rdi, rax                ; fd
+    mov     rsi, ?                  ; buf
+    mov     rdx, 0                  ; count
+    syscall
+
 
     mov     rsp, rbp
     pop     rbp
