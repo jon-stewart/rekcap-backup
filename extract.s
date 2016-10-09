@@ -319,6 +319,6 @@ xor_copy:
     mov     [rdi], al
     dec     rcx
     test    rcx, rcx
-    jne     .loop
+    jnz     .loop
 
     ret
