@@ -44,7 +44,7 @@
 global _start
 
 _start:
-    push    rbp                 ; TODO this is NULL, should use differently
+; rbp is NULL - nothing to push to stack
     mov     rbp, rsp
     sub     rsp, 0x20
     call    delta
@@ -56,14 +56,9 @@ delta:
 
     print   [rbp-8], msg_start, msg_start_sz
 
-    ; the search for auxv
-    mov     rsi, rsp
-    add     rsi, 0x48           ; need to move past stack frame, argc and argv
-find_auxv:
-    add     rsi, 8
-    mov     rax, [rsi]
-    test    rax, rax
-    jne     find_auxv
+    mov     rdi, rsp
+    add     rdi, 0x20           ; need to move past stack frame
+    call    find_auxv
 
     ; found auxv
 
@@ -88,7 +83,6 @@ find_auxv:
     mov     rax, [rsi + 0x70]
     mov     [rbp-0x20], rax
 
-
     print   [rbp-8], msg_end, msg_end_sz
 
 exit:
@@ -104,3 +98,41 @@ msg_start_sz:   equ $-msg_start
 
 msg_end:        db "end",10,0
 msg_end_sz:     equ $-msg_end
+
+
+;------------------------------------------------------------------------------
+; Name:
+;   find_auxv
+;
+; Description:
+;   Jump rsi to beyond argc, argv and NULL to the start of environ vars.
+;
+;   Traverse stack with rsi until hit NULL, this is end of environ var.
+;
+;   Inc rsi 8byte to the start of auxv and return in rax.
+;
+; Stack:
+;   No need to store/adjust
+;
+; In:
+;   rdi-start address of stack
+;
+; Out:
+;   rax-start address of auxv
+;
+; Reg:
+;   rax
+;   rsi
+;
+find_auxv:
+    mov     rsi, rdi
+    add     rsi, 0x18
+loop:
+    add     rsi, 8
+    mov     rax, [rsi]
+    test    rax, rax
+    jne     loop
+
+    add     rsi, 8
+    mov     rax, rsi
+    ret
