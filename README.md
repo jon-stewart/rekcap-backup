@@ -26,3 +26,8 @@ Auxillary Vector Keys:
     AT_PHENT : 4
     AT_PHNUM : 5
     AT_ENTRY : 9
+
+
+Userland Exec Paper:
+
+    https://grugq.github.io/docs/ul_exec.txt
