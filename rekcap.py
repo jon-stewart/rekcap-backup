@@ -42,7 +42,7 @@ elf.create_ehdr()
 
 elf.create_phdr(0x800000, 5, extract_stub)
 
-elf.create_phdr(0x400000, 6, binary)
+elf.create_phdr(0x1000000, 6, binary)
 
 elf.padding(200)
 

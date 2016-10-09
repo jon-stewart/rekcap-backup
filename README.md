@@ -1,22 +1,26 @@
 # rekcap
 rekcap:packer
 
- * Create elf header
- * Add single program header which will load whole binary into memory
- * Shove in some compiled position independent assembly and set p_entry
 
-Next:
+Packing:
 
-~~* Load elf into some other address~~
-
-~~* Provide a random elf and XOR it into a new .data segment~~
- * Have stub traverse stack to AUXV and find the elf program headers
- * mmap(exec|write) to 0x400000
- * XOR original elf from .data segment into 0x400000
- * Userland exec
+    * Create elf header
+    * Add single program header which will load whole binary into memory
+    * Shove in some compiled position independent assembly and set p_entry
+    * Provide random elf and XOR it into RW segment
+    * Correctly set offsets and sizes
 
 
-AUXV
+Unpacking:
+
+    * Traverse stack to AUXV
+    * Extract elf program header info from AUXV
+    * mmap(exec|write) to original elf base address (0x400000)
+    * XOR original elf from segment into newly mapped memory
+    * Userland exec
+
+
+Auxillary Vector Keys:
 
     AT_PHDR  : 3
     AT_PHENT : 4

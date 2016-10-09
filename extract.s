@@ -41,6 +41,8 @@
 ; [rbp-0x18] : phdr size
 ; [rbp-0x20] : phdr number
 
+%define UNPACK_ADDR 0x400000
+
 global _start
 
 _start:
@@ -71,6 +73,30 @@ delta:
     mov     rsi, 5              ; AT_PHNUM
     call    get_auxv_val
     mov     [rbp-0x20], rax
+
+
+    ; find data phdr.  This is 2nd.
+    mov     rsi, [rbp-0x10]
+    add     rsi, [rbp-0x18]
+
+    mov     rbx, [rsi + 0x10]      ; p_vaddr
+    mov     rcx, [rsi + 0x28]      ; p_memsz
+
+    ; mmap
+    mov     rax, 9                  ; sys_mmap
+    mov     rdi, UNPACK_ADDR        ; addr
+    mov     rsi, rcx                ; len
+    mov     rdx, 7                  ; prot  (RWE)
+    mov     r10, 0x22               ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
+    xor     r8, r8                  ; fd    (ignored)
+    xor     r9, r9                  ; off   (ignored)
+    syscall
+
+    ; munmap
+    mov     rax, 0xb                ; sys_munmap
+    mov     rdi, UNPACK_ADDR        ; addr
+    mov     rsi, rcx                ; len
+    syscall
 
     print   [rbp-8], msg_end, msg_end_sz
 
