@@ -44,8 +44,7 @@
 global _start
 
 _start:
-; rbp is NULL - nothing to push to stack
-    mov     rbp, rsp
+    mov     rbp, rsp            ; rbp is NULL - nothing to push to stack
     sub     rsp, 0x20
     call    delta
 
@@ -56,31 +55,21 @@ delta:
 
     print   [rbp-8], msg_start, msg_start_sz
 
-    mov     rdi, rsp
-    add     rdi, 0x20           ; need to move past stack frame
+    mov     rdi, rbp            ; beyond stack frame
     call    find_auxv
 
-    ; found auxv
+    mov     rdi, rax            ; base address of auxv
 
-    ; AT_PHDR  (3)
-    mov     rax, [rsi + 0x48]
-    cmp     rax, 3
-    jne     exit                ; verify
-    mov     rax, [rsi + 0x50]
+    mov     rsi, 3              ; AT_PHDR
+    call    get_auxv_val
     mov     [rbp-0x10], rax
 
-    ; AT_PHENT (4)
-    mov     rax, [rsi + 0x58]
-    cmp     rax, 4              ; verify
-    jne     exit
-    mov     rax, [rsi + 0x60]
+    mov     rsi, 4              ; AT_PHENT
+    call    get_auxv_val
     mov     [rbp-0x18], rax
 
-    ; AT_PHNUM (5)
-    mov     rax, [rsi + 0x68]
-    cmp     rax, 5              ; verify
-    jne     exit
-    mov     rax, [rsi + 0x70]
+    mov     rsi, 5              ; AT_PHNUM
+    call    get_auxv_val
     mov     [rbp-0x20], rax
 
     print   [rbp-8], msg_end, msg_end_sz
@@ -90,7 +79,7 @@ exit:
     pop     rbp
 
     mov     rax, 60             ; sys_exit
-    xor     rdi, rdi            ; err
+                                ; rdi:error code
     syscall
 
 msg_start:      db "start",10,0
@@ -105,11 +94,11 @@ msg_end_sz:     equ $-msg_end
 ;   find_auxv
 ;
 ; Description:
-;   Jump rsi to beyond argc, argv and NULL to the start of environ vars.
+;   Jump 3 qword (argc, argv and NULL) to the start of environ vars.
 ;
-;   Traverse stack with rsi until hit NULL, this is end of environ var.
+;   Traverse stack until hit NULL, this is end of environ var.
 ;
-;   Inc rsi 8byte to the start of auxv and return in rax.
+;   Jump 1 qword to the start of auxv and return effective address in rax.
 ;
 ; Stack:
 ;   No need to store/adjust
@@ -120,19 +109,55 @@ msg_end_sz:     equ $-msg_end
 ; Out:
 ;   rax-start address of auxv
 ;
-; Reg:
+; Modifies:
 ;   rax
-;   rsi
+;   rcx
 ;
 find_auxv:
-    mov     rsi, rdi
-    add     rsi, 0x18
-loop:
-    add     rsi, 8
-    mov     rax, [rsi]
+    mov     rcx, 0x18
+    jmp     .begin
+.loop:
+    add     rcx, 8
+.begin:
+    mov     rax, [rdi + rcx]
     test    rax, rax
-    jne     loop
+    jne     .loop
 
-    add     rsi, 8
-    mov     rax, rsi
+    add     rcx, 8
+    lea     rax, [rdi + rcx]
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   get_auxv_val
+;
+; Description:
+;   Iterate through keys in auxv and return value (rax) of matching key (rsi).
+;
+; Stack:
+;   No need to store/adjust
+;
+; In:
+;   rdi-base address of auxv
+;   rsi-auxv key
+;
+; Out:
+;   rax-auxv value
+;
+; Modifies:
+;   rax
+;   rcx
+;
+get_auxv_val:
+    xor     rcx, rcx
+    jmp     .begin
+.loop:
+    add     rcx, 0x10   ; move to next key
+.begin:
+    mov     rax, [rdi + rcx]
+    cmp     rax, rsi
+    jne     .loop
+
+    add     rcx, 8
+    mov     rax, [rdi + rcx]
     ret
