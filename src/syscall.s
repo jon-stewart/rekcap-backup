@@ -26,6 +26,8 @@ GLOBAL _mmap, _munmap, open, read, _fstat
 ;   rax
 ;
 _mmap:
+    push    rbx
+    push    rcx
     push    rdx
     push    r8
     push    r9
@@ -42,6 +44,8 @@ _mmap:
     pop     r9
     pop     r8
     pop     rdx
+    pop     rcx
+    pop     rbx
     ret
 
 ;------------------------------------------------------------------------------
