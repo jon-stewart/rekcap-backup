@@ -116,6 +116,7 @@ xor_copy:
 ;   Iterate through extracted elf phdr and mmap the PT_LOAD segments.
 ;
 ; Stack:
+;   [rbp-0x8] : elf base addr
 ;   rdi
 ;   rsi
 ;   rbx
@@ -129,6 +130,10 @@ xor_copy:
 ;   rdx
 ;
 load_elf:
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 8
+
     push    rdi
     push    rsi
     push    rbx
@@ -137,6 +142,8 @@ load_elf:
     push    r13
     push    r14
     push    r15
+
+    mov     [rbp-0x8], rdi
 
     mov     rax, [rdi + 0x20]       ; e_phoff
     lea     rsi, [rdi + rax]        ; phdr addr
@@ -164,14 +171,21 @@ load_elf:
 
     phdr_phys_info rsi, r14, r15
 
-    add     r14, rdi                ; add base address to p_offset
+    add     r14, [rbp-0x8]          ; add base address to p_offset
+
+    push    rsi
+    push    rcx
 
     mmap    r12, r13
 
     mov     rdi, r12
     mov     rsi, r14
-    mov     rcx, r13
+    mov     rcx, r15
+    cld
     rep     movsb                   ; copy data into new segment
+
+    pop     rcx
+    pop     rsi
 
     jmp     .loop
 .end:
@@ -184,6 +198,8 @@ load_elf:
     pop     rbx
     pop     rsi
     pop     rdi
+    mov     rsp, rbp
+    pop     rbp
     ret
 
 ;------------------------------------------------------------------------------
@@ -308,7 +324,8 @@ read_interp:
 ;   Iterate through the interpreter elf headers and mmap the PT_LOAD segments.
 ;
 ; Stack:
-;   [rbp-0x8] : e_entry
+;   [rbp-0x8]  : e_entry
+;   [rbp-0x10] : elf base addr
 ;   rdi
 ;   rsi
 ;   rbx
@@ -330,7 +347,7 @@ read_interp:
 load_interp:
     push    rbp
     mov     rbp, rsp
-    sub     rsp, 8
+    sub     rsp, 0x10
     push    rdi
     push    rsi
     push    rbx
@@ -342,6 +359,8 @@ load_interp:
 
     nop
     nop
+
+    mov     [rbp-0x10], rdi
 
     mov     rax, [rdi + 0x18]         ; e_entry
     mov     [rbp-0x8], rax
@@ -372,14 +391,21 @@ load_interp:
 
     phdr_phys_info rsi, r14, r15
 
-    add     r14, rdi                ; add base address to p_offset
+    add     r14, [rbp-0x10]         ; add base address to p_offset
+
+    push    rsi
+    push    rcx
 
     mmap    r12, r13
 
     mov     rdi, r12
     mov     rsi, r14
-    mov     rcx, r13
+    mov     rcx, r15
+    cld
     rep     movsb                   ; copy data into segment
+
+    pop     rcx
+    pop     rsi
 
     jmp     .loop
 .end:
@@ -392,6 +418,7 @@ load_interp:
     pop     rbx
     pop     rsi
     pop     rdi
+    add     rsp, 8
     pop     rax                     ; return e_entry
     pop     rbp
     ret
