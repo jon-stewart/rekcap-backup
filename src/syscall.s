@@ -1,4 +1,4 @@
-GLOBAL _mmap, _munmap
+GLOBAL _mmap, _munmap, fstat_filesz
 
 ;------------------------------------------------------------------------------
 ; Name:
@@ -66,4 +66,36 @@ _munmap:
     mov     rax, 0xb                ; sys_munmap
     syscall
 
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   fstat_filesz
+;
+; Description:
+;   Setup and make sys_fstat call, return st_size from struct stat buf.
+;
+; Stack:
+;   struct stat buf
+;
+; In:
+;   rdi-fd
+;
+; Out:
+;   rax-file size
+;
+fstat_filesz:
+    push    rbp
+    mov     rbp, rsp
+
+    sub     rsp, 144                ; sizeof struct stat
+
+    mov     rax, 5                  ; sys_fstat
+    mov     rsi, rsp                ; statbuf
+    syscall
+
+    mov     rax, [rsp + 48]         ; st_size
+
+    mov     rsp, rbp
+    pop     rbp
     ret
