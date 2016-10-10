@@ -17,7 +17,13 @@ Unpacking:
     * Extract elf program header info from AUXV
     * mmap(exec|write) to original elf base address (0x400000)
     * XOR original elf from segment into newly mapped memory
-    * Userland exec
+    * Foreach PT_LOAD segment in original elf : mmap and memcpy
+    * Get PT_INTERP segment in original elf, path to ld-linux
+    * fstat, mmap and read in ld-linux
+    * Foreach PT_LOAD segment in ld-linux : mmap and memcpy (DYN so .text is va:0, needs random address)
+    * Update the auxv with values from original elf
+    * Update AT_BASE in auxv with address ld-linux .text segment loaded to
+    * Jump to ld-linux e_entry
 
 
 Auxillary Vector Keys:
