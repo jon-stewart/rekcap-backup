@@ -1,6 +1,6 @@
-GLOBAL extract_elf, load_elf, cleanup_elf_scratchpad, find_interp
+GLOBAL extract_elf, load_elf, find_interp
 
-EXTERN _mmap, _munmap, fstat_filesz
+EXTERN _mmap, _munmap, open, read, _fstat
 
 %include "src/elf.mac"
 %include "src/syscall.mac"
@@ -26,6 +26,9 @@ EXTERN _mmap, _munmap, fstat_filesz
 ;   rsi-phdr addr
 ;   rdx-phdr entry size
 ;
+; Out:
+;   rax-size of scratchpad
+;
 ; Modifies:
 ;   rax
 ;   rdx
@@ -47,6 +50,8 @@ extract_elf:
     mov     rsi, rbx                ; src
     mov     rdx, rcx                ; count
     call    xor_copy
+
+    mov     rax, rcx
 
     pop     rcx
     pop     rbx
@@ -165,49 +170,6 @@ load_elf:
 
 ;------------------------------------------------------------------------------
 ; Name:
-;   cleanup_elf_scratchpad
-;
-; Description:
-;   Accessing stub elf, get pm_memsz from 2nd phdr and munmap the elf scratch
-;   pad.
-;
-; Stack:
-;   rdi
-;   rsi
-;   rbx
-;   rcx
-;
-; In:
-;   rdi-elf scratchpad addr
-;   rsi-phdr addr
-;   rdx-phdr entry size
-;
-; Modifies:
-;   rax
-;   rdx
-;
-cleanup_elf_scratchpad:
-    push    rdi
-    push    rsi
-    push    rbx
-    push    rcx
-
-    lea     rax, [rsi + rdx]        ; 2nd phdr addr
-
-    ; rbx-p_vaddr
-    ; rcx-p_memsz
-    phdr_virt_info rax, rbx, rcx
-
-    munmap  rdi, rcx
-
-    pop     rcx
-    pop     rbx
-    pop     rsi
-    pop     rdi
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
 ;   find_interp
 ;
 ; Description:
@@ -267,27 +229,58 @@ find_interp:
 
 ;------------------------------------------------------------------------------
 ; Name:
-;   load_interp
+;   read_interp
 ;
 ; Description:
+;   fstat interpreter file and get fsize.  Map region of memory and read in
+;   file.
+;
+;   Return fsize so it can be cleaned up later.
 ;
 ; Stack:
-;   rdi
-;   rsi
-;   rbx
+;   [rbp-0x8]  : interp scratchpad addr
+;   [rbp-0x10] : interp string addr
 ;   rcx
 ;
 ; In:
-;   rdi-elf base addr
-;   rsi-interp scratchpad addr
+;   rdi-interp scratchpad addr
+;   rsi-interp string addr
+;
+; Out:
+;   rax-interpreter size
 ;
 ; Modifies:
 ;   rax
-;   rdx
 ;
-load_interp:
-...
+read_interp:
+    push    rbp
+    mov     rbp, rsp
+    push    rdi
+    push    rsi
+    push    rcx
 
+    mov     [rbp-8], rdi
+    mov     [rbp-0x10], rsi
+
+    fstat_filesz rsi
+
+    mmap    [rbp-8], rcx
+
+    mov     rdi, [rbp-0x10]
+    call    open
+
+    mov     rdi, rax            ; fd
+    mov     rsi, [rbp-8]        ; buf addr
+    mov     rdx, rcx            ; count
+    call    read
+
+    mov     rax, rcx            ; return interp size
+
+    pop     rcx
+    pop     rsi
+    pop     rdi
+    pop     rbp
+    ret
 
 ; Description:
 ;   Traverse elf headers and find the PT_INTERP and PT_LOAD phdrs.

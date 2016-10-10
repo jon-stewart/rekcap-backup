@@ -1,11 +1,13 @@
-GLOBAL _mmap, _munmap, fstat_filesz
+GLOBAL _mmap, _munmap, open, read, _fstat
 
 ;------------------------------------------------------------------------------
 ; Name:
 ;   _mmap
 ;
 ; Description:
-;   Setup and make sys_mmap call
+;   Call via macro.
+;
+;   Setup and make sys_mmap call.
 ;
 ; Stack:
 ;   rdx
@@ -47,7 +49,9 @@ _mmap:
 ;   _munmap
 ;
 ; Description:
-;   Setup and make sys_munmap call
+;   Call via macro.
+;
+;   Setup and make sys_munmap call.
 ;
 ; Stack:
 ;   Nothing
@@ -70,32 +74,82 @@ _munmap:
 
 ;------------------------------------------------------------------------------
 ; Name:
-;   fstat_filesz
+;   open
 ;
 ; Description:
-;   Setup and make sys_fstat call, return st_size from struct stat buf.
+;   Setup and make sys_open call
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-filename
+;
+; Out:
+;   rax-error
+;
+; Modifies:
+;   rax
+;   rdx
+;
+open:
+    push    rsi
+
+    mov     rax, 2                  ; sys_open
+    xor     rsi, rsi                ; flags
+    xor     rdx, rdx                ; mode
+    syscall
+
+    pop     rsi
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   read
+;
+; Description:
+;   Setup and make sys_read call.
+;
+; Stack:
+;   Nothing
+;
+; In:
+;   rdi-fd
+;   rsi-buf
+;   rdx-count
+;
+; Out:
+;   rax-error
+;
+; Modifies:
+;   rax
+;
+read:
+    mov     rax, 0                  ; sys_read
+    syscall
+
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   _fstat
+;
+; Description:
+;   Call via macro.
+;
+;   Setup and make sys_fstat call.
 ;
 ; Stack:
 ;   struct stat buf
 ;
 ; In:
-;   rdi-fd
+;   rdi-struct stat buf
 ;
 ; Out:
-;   rax-file size
+;   rax-error
 ;
-fstat_filesz:
-    push    rbp
-    mov     rbp, rsp
-
-    sub     rsp, 144                ; sizeof struct stat
-
+_fstat:
     mov     rax, 5                  ; sys_fstat
-    mov     rsi, rsp                ; statbuf
     syscall
 
-    mov     rax, [rsp + 48]         ; st_size
-
-    mov     rsp, rbp
-    pop     rbp
     ret

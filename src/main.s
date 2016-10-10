@@ -33,17 +33,14 @@ EXTERN _mmap, _munmap
 
 ; stack
 ; [rbp-0x8]  : base address
-; [rbp-0x10] : phdr vaddr
-; [rbp-0x18] : phdr size
-; [rbp-0x20] : phdr number
-; [rbp-0x28] : p_vaddr (xor'd elf address)
-; [rbp-0x30] : p_memsz (xor'd elf size)
+; [rbp-0x10] : elf scratchpad size
+; [rbp-0x18] : interp scratchpad size
 
 global _start
 
 _start:
     mov     rbp, rsp                ; rbp is NULL - nothing to push to stack
-    sub     rsp, 0x30
+    sub     rsp, 0x18
     call    delta
 
 delta:
@@ -60,20 +57,18 @@ delta:
 
     mov     rsi, 3                  ; AT_PHDR
     call    get_auxv_val
-    mov     [rbp-0x10], rax
+    mov     r10, rax
 
     mov     rsi, 4                  ; AT_PHENT
     call    get_auxv_val
-    mov     [rbp-0x18], rax
-
-    mov     rsi, 5                  ; AT_PHNUM
-    call    get_auxv_val
-    mov     [rbp-0x20], rax
+    mov     r11, rax
 
     mov     rdi, ELF_SCRATCHPAD
-    mov     rsi, [rbp-0x10]         ; phdr addr
-    mov     rdx, [rbp-0x18]         ; phdr entry size
+    mov     rsi, r10                ; phdr addr
+    mov     rdx, r11                ; phdr entry size
     call    extract_elf
+
+    mov     [rbp-0x10], rax         ; elf scratchpad size
 
     call    load_elf
 
@@ -81,16 +76,22 @@ delta:
 
     mov     rdi, INTERP_SCRATCHPAD
     mov     rsi, rax                ; interp string addr
-    call    load_interp
+    call    read_interp
 
-    mov     rdi, ELF_SCRATCHPAD
-    mov     rsi, [rbp-0x10]         ; phdr addr
-    mov     rdx, [rbp-0x18]         ; phdr entry size
-    call    cleanup_elf_scratchpad
+    mov     [rbp-0x18], rax         ; interp scratchpad size
+
+
+
+    munmap  ELF_SCRATCHPAD, [rbp-0x10]
+
+    munmap  INTERP_SCRATCHPAD, [rbp-0x18]
 
     print   [rbp-8], msg_end, msg_end_sz
 
+
 exit:
+    add     rsp, 0x18
+
     mov     rsp, rbp
     pop     rbp
 
@@ -118,52 +119,6 @@ msg_end_sz:     equ $-msg_end
 ;   r12
 ;
 load_interp:
-    push    rbp
-    mov     rbp, rsp
-    push    r12
-
-
-    mov     rbx, rsi
-    mov     r12, rdi
-    mov     rcx, rdx
-
-    jmp     .begin
-.loop:
-    add     r12, rbx
-    dec     rcx
-
-    test    rcx, rcx
-    jz      .end
-.begin:
-    xor     rax, rax
-    mov     eax, [r12]              ; p_type
-    cmp     eax, 3                  ; PT_INTERP
-    jne     .loop
-.end:
-
-    phdr_phys_info rsi, rdi, rsi
-
-    sub     rsp, rdx                ; create space on stack
-
-    ; zero out
-    xor     rax, rax
-    mov     rdi, rsp
-    mov     rcx, rbx
-    rep     stosb
-
-    ; copy string into stack
-    mov     rdi, rsp
-    mov     rsi, r8
-    add     rsi, rdx
-    mov     rcx, rbx
-    rep     movsb
-
-
-    mov     rax, 2                  ; sys_open
-    mov     rdi, rsp                ; filename
-    xor     rsi, rsi                ; flags
-    xor     rdx, rdx                ; mode
-    syscall
 
     push    rax                     ; fd
 
