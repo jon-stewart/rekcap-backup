@@ -90,7 +90,7 @@ delta:
 
     mov     rdi, [rbp-0x10]         ; auxv addr
     mov     rsi, ELF_SCRATCHPAD
-    mov     rdx, [rbp-0x28]         ; interp e_entry
+    mov     rdx, 0x6000000          ; interp .text dyn address TODO tidy
     call    update_auxv
 
     munmap  ELF_SCRATCHPAD, [rbp-0x10]

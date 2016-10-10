@@ -257,6 +257,8 @@ find_interp:
 
     phdr_phys_info rsi, rax, rdx
 
+    add     rax, rdi                ; add elf base address to interp string offset
+
     pop     rcx
     pop     rbx
     pop     rsi
@@ -390,9 +392,14 @@ load_interp:
 
     phdr_virt_info rsi, r12, r13
 
+    test    r12, r12                ; ld-linux is DYN of course! pick some random address
+    jnz     .hop
+    mov     r12, 0x6000000          ; TODO tidy hardcoded!
+.hop:
+
     phdr_phys_info rsi, r14, r15
 
-    add     r14, [rbp-0x10]         ; add base address to p_offset
+    add     r14, rdi                ; add base addr to p_offset
 
     push    rsi
     push    rcx
