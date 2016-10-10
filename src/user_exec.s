@@ -164,6 +164,8 @@ load_elf:
 
     phdr_phys_info rsi, r14, r15
 
+    add     r14, rdi                ; add base address to p_offset
+
     mmap    r12, r13
 
     mov     rdi, r12
@@ -369,6 +371,8 @@ load_interp:
     phdr_virt_info rsi, r12, r13
 
     phdr_phys_info rsi, r14, r15
+
+    add     r14, rdi                ; add base address to p_offset
 
     mmap    r12, r13
 
