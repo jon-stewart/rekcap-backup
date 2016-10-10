@@ -33,5 +33,5 @@
 ;
 %macro phdr_phys_info 3
     mov     %2, [%1 + 0x8]        ; p_offset
-    mov     %2, [%1 + 0x20]       ; p_filesz
+    mov     %3, [%1 + 0x20]       ; p_filesz
 %endmacro

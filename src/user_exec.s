@@ -338,6 +338,9 @@ load_interp:
     push    r14
     push    r15
 
+    nop
+    nop
+
     mov     rax, [rdi + 0x18]         ; e_entry
     mov     [rbp-0x8], rax
 
