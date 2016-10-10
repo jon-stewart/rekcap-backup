@@ -1,4 +1,4 @@
-GLOBAL extract_elf, load_elf, cleanup_elf_scratchpad, userland_exec
+GLOBAL extract_elf, load_elf, cleanup_elf_scratchpad, find_interp
 
 EXTERN _mmap, _munmap, fstat_filesz
 
@@ -168,9 +168,8 @@ load_elf:
 ;   cleanup_elf_scratchpad
 ;
 ; Description:
-;   Jump phdr pointer to 2nd entry.  Get p_memsz from phdr.
-;
-;   Unmap the elf scratch pad
+;   Accessing stub elf, get pm_memsz from 2nd phdr and munmap the elf scratch
+;   pad.
 ;
 ; Stack:
 ;   rdi
@@ -206,6 +205,89 @@ cleanup_elf_scratchpad:
     pop     rsi
     pop     rdi
     ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   find_interp
+;
+; Description:
+;   Access the original elf headers and return the addr/size of the PT_INTERP
+;   segment.
+;
+; Stack:
+;   rsi
+;   rbx
+;   rcx
+;
+; In:
+;   rdi-elf base addr
+;
+; Out:
+;   rax-address of interp string
+;   rdx-length of interp string
+;
+; Modifies:
+;   rax
+;   rdx
+;
+find_interp:
+    push    rsi
+    push    rbx
+    push    rcx
+
+    mov     rax, [rdi + 0x20]       ; e_phoff
+    lea     rsi, [rdi + rax]        ; phdr addr
+
+    xor     rbx, rbx
+    mov     bl, [rdi + 0x36]        ; e_phent
+
+    xor     rcx, rcx
+    mov     cl, [rdi + 0x38]        ; e_phnum
+
+    jmp     .begin
+.loop:
+    add     rsi rbx
+    dec     rcx
+
+    test    rcx, rcx
+    jz      .end
+.begin:
+    xor     rax, rax
+    mov     eax, [rsi]              ; p_type
+    cmp     eax, 3                  ; PT_INTERP
+    jne     .loop
+.end:
+
+    phdr_phys_info rsi, rax, rdx
+
+    pop     rcx
+    pop     rbx
+    pop     rsi
+	ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   load_interp
+;
+; Description:
+;
+; Stack:
+;   rdi
+;   rsi
+;   rbx
+;   rcx
+;
+; In:
+;   rdi-elf base addr
+;   rsi-interp scratchpad addr
+;
+; Modifies:
+;   rax
+;   rdx
+;
+load_interp:
+...
+
 
 ; Description:
 ;   Traverse elf headers and find the PT_INTERP and PT_LOAD phdrs.

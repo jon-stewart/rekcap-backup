@@ -77,6 +77,12 @@ delta:
 
     call    load_elf
 
+    call    find_interp
+
+    mov     rdi, INTERP_SCRATCHPAD
+    mov     rsi, rax                ; interp string addr
+    call    load_interp
+
     mov     rdi, ELF_SCRATCHPAD
     mov     rsi, [rbp-0x10]         ; phdr addr
     mov     rdx, [rbp-0x18]         ; phdr entry size
