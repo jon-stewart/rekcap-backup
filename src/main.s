@@ -16,7 +16,7 @@
 [BITS 64]
 
 ; elf.s
-EXTERN find_auxv, get_auxv_val, set_auxv_val
+EXTERN find_auxv, get_auxv_val
 
 ; user_exec.s
 EXTERN extract_elf, load_elf, find_interp, read_interp, load_interp, update_auxv
@@ -32,15 +32,17 @@ EXTERN _mmap, _munmap
 %define INTERP_SCRATCHPAD   0x4000000
 
 ; stack
-; [rbp-0x8]  : base address
-; [rbp-0x10] : elf scratchpad size
-; [rbp-0x18] : interp scratchpad size
+; [rbp-0x8]  : base addr
+; [rbp-0x10] : auxv addr
+; [rbp-0x18] : elf scratchpad size
+; [rbp-0x20] : interp scratchpad size
+; [rbp-0x28] : interp e_entry
 
 global _start
 
 _start:
     mov     rbp, rsp                ; rbp is NULL - nothing to push to stack
-    sub     rsp, 0x18
+    sub     rsp, 0x28
     call    delta
 
 delta:
@@ -53,7 +55,9 @@ delta:
     mov     rdi, rbp                ; beyond stack frame
     call    find_auxv
 
-    mov     rdi, rax                ; base address of auxv
+    mov     [rbp-0x10], rax         ; base addr of auxv
+
+    mov     rdi, rax
 
     mov     rsi, 3                  ; AT_PHDR
     call    get_auxv_val
@@ -68,7 +72,7 @@ delta:
     mov     rdx, r11                ; phdr entry size
     call    extract_elf
 
-    mov     [rbp-0x10], rax         ; elf scratchpad size
+    mov     [rbp-0x18], rax         ; elf scratchpad size
 
     call    load_elf
 
@@ -78,10 +82,16 @@ delta:
     mov     rsi, rax                ; interp string addr
     call    read_interp
 
-    mov     [rbp-0x18], rax         ; interp scratchpad size
+    mov     [rbp-0x20], rax         ; interp scratchpad size
 
     call    load_interp
 
+    mov     [rbp-0x28], rax         ; interp e_entry
+
+    mov     rdi, [rbp-0x10]         ; auxv addr
+    mov     rsi, ELF_SCRATCHPAD
+    mov     rdx, [rbp-0x28]         ; interp e_entry
+    call    update_auxv
 
     munmap  ELF_SCRATCHPAD, [rbp-0x10]
 
@@ -89,12 +99,12 @@ delta:
 
     print   [rbp-8], msg_end, msg_end_sz
 
+fin:
+    mov     rax, [rbp-0x28]
+    mov     rsp, rbp
+    jmp     rax                     ; fingers crossed
 
 exit:
-    add     rsp, 0x18
-
-    mov     rsp, rbp
-    pop     rbp
 
     mov     rax, 60                 ; sys_exit
                                     ; rdi:error code

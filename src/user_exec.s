@@ -1,6 +1,7 @@
 GLOBAL extract_elf, load_elf, find_interp, read_interp, load_interp, update_auxv
 
 EXTERN _mmap, _munmap, open, read, _fstat
+EXTERN set_auxv_val
 
 %include "src/elf.mac"
 %include "src/syscall.mac"
@@ -208,7 +209,7 @@ find_interp:
 
     jmp     .begin
 .loop:
-    add     rsi rbx
+    add     rsi, rbx
     dec     rcx
 
     test    rcx, rcx
@@ -352,5 +353,44 @@ load_interp:
 ; Name:
 ;   update_auxv
 ;
+; Description:
+;   Update values of AUXV to those of extracted elf.
+;
+; Stack:
+;   rsi
+;   rbx
+;
+; In:
+;   rdi-base addr of auxv
+;   rsi-base addr of extracted elf
+;   rdx-interp e_entry
+;
 update_auxv:
+    push    rsi
+    push    rbx
 
+    mov     rax, rsi                ; elf base addr
+    mov     rbx, rdx                ; interp e_entry
+
+    mov     rsi, 3                  ; AT_PHDR (3)
+    mov     rdx, [rax + 0x20]       ; e_phoff
+    call    set_auxv_val
+
+    mov     rsi, 4                  ; AT_PHENT
+    xor     rdx, rdx
+    mov     dl, [rax + 0x36]        ; e_phent
+    call    set_auxv_val
+
+    mov     rsi, 5                  ; AT_PHNUM
+    xor     rdx, rdx
+    mov     dl, [rax + 0x38]        ; e_phnum
+
+    mov     rsi, 7                  ; AT_BASE
+    mov     rdx, rbx                ; interp e_entry  TODO REALLY?
+
+    mov     rsi, 9                  ; AT_ENTRY
+    mov     rdx, [rax + 0x18]       ; elf e_entry
+
+    pop     rbx
+    pop     rsi
+    ret
