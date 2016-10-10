@@ -172,6 +172,7 @@ load_elf:
     phdr_phys_info rsi, r14, r15
 
     add     r14, [rbp-0x8]          ; add base address to p_offset
+    add     r13, 0xf6fb8            ; TODO this is a hack - mmap rounding down, memcpy blows up
 
     push    rsi
     push    rcx
@@ -357,7 +358,7 @@ load_interp:
     push    r14
     push    r15
 
-    nop
+    nop                                 ; TODO i should merge load_elf/load_interp
     nop
 
     mov     [rbp-0x10], rdi
