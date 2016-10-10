@@ -1,26 +1,5 @@
 ;------------------------------------------------------------------------------
 ; Name:
-;   print
-;
-; Description:
-;   Write string to stdout
-;
-; In:
-;   1-base address
-;   2-string offset
-;   3-string length
-;
-%macro print 3
-    mov     rax, 1                  ; sys_write
-    mov     rdi, 1                  ; stdout
-    mov     rdx, %1
-    lea     rsi, [rdx + %2]         ; buf
-    mov     rdx, %3                 ; count
-    syscall
-%endmacro
-
-;------------------------------------------------------------------------------
-; Name:
 ;   extract
 ;
 ; Description:
@@ -35,6 +14,13 @@
 [section .text]
 
 [BITS 64]
+
+EXTERN find_auxv, get_auxv_val, set_auxv_val
+EXTERN xor_copy
+EXTERN _mmap, _munmap
+
+%include "src/elf.mac"
+%include "src/syscall.mac"
 
 ; Address to unpack the original elf file
 %define ELF_SCRATCHPAD      0x2000000
@@ -86,14 +72,11 @@ delta:
     mov     rax, [rbp-0x10]         ; phdr address
     mov     rbx, [rbp-0x18]         ; phdr entry size
     lea     rdi, [rax + rbx]        ; 2nd phdr
-    call    get_phdr_info
-    mov     [rbp-0x28], rax         ; p_vaddr
-    mov     [rbp-0x30], rbx         ; p_memsz
+    get_phdr_virt_info rdi, rax, rbx
+    mov     [rbp-0x28], rax
+    mov     [rbp-0x30], rbx
 
-    ; mmap
-    mov     rdi, ELF_SCRATCHPAD     ; addr
-    mov     rsi, [rbp-0x30]         ; len
-    call    mmap
+    mmap ELF_SCRATCHPAD, [rbp-30]
 
     ; copy and xor original elf into mapped region
     mov     rdi, ELF_SCRATCHPAD     ; dst
@@ -106,9 +89,7 @@ delta:
     call    userland_exec
 
     ; munmap the scratch pad
-    mov     rdi, ELF_SCRATCHPAD     ; addr
-    mov     rsi, [rbp-0x30]         ; len
-    call    munmap
+    munmap ELF_SCRATCHPAD, [rbp-0x30]
 
 
     print   [rbp-8], msg_end, msg_end_sz
@@ -127,209 +108,6 @@ msg_start_sz:   equ $-msg_start
 msg_end:        db "end",10,0
 msg_end_sz:     equ $-msg_end
 
-
-;------------------------------------------------------------------------------
-; Name:
-;   find_auxv
-;
-; Description:
-;   Jump 3 qword (argc, argv and NULL) to the start of environ vars.
-;
-;   Traverse stack until hit NULL, this is end of environ var.
-;
-;   Jump 1 qword to the start of auxv and return effective address in rax.
-;
-; Stack:
-;   No need to store/adjust
-;
-; In:
-;   rdi-start address of stack
-;
-; Out:
-;   rax-start address of auxv
-;
-; Modifies:
-;   rax
-;   rcx
-;
-find_auxv:
-    mov     rcx, 0x18
-    jmp     .begin
-.loop:
-    add     rcx, 8
-.begin:
-    mov     rax, [rdi + rcx]
-    test    rax, rax
-    jne     .loop
-
-    add     rcx, 8
-    lea     rax, [rdi + rcx]
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   get_auxv_val
-;
-; Description:
-;   Iterate through keys in auxv and return value (rax) of matching key (rsi).
-;
-; Stack:
-;   No need to store/adjust
-;
-; In:
-;   rdi-base address of auxv
-;   rsi-auxv key
-;
-; Out:
-;   rax-auxv value
-;
-; Modifies:
-;   rax
-;   rcx
-;
-get_auxv_val:
-    xor     rcx, rcx
-    jmp     .begin
-.loop:
-    add     rcx, 0x10               ; move to next key
-.begin:
-    mov     rax, [rdi + rcx]
-    cmp     rax, rsi
-    jne     .loop
-
-    add     rcx, 8                  ; move to value
-    mov     rax, [rdi + rcx]
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   get_phdr_info
-;
-; Description:
-;   return p_vaddr and p_memsz
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-phdr start address
-;
-; Out:
-;   rax-p_vaddr
-;   rbx-p_memsz
-;
-; Modifies:
-;   rax
-;   rbx
-;   r8
-get_phdr_info:
-	mov		rax, [rdi + 0x10]
-	mov		rbx, [rdi + 0x28]
-
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   mmap
-;
-; Description:
-;   Setup and make sys_mmap call
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-address
-;   rsi-length
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
-;   rdx
-;   r10
-;   r8
-;   r9
-;
-mmap:
-    mov     rax, 9                  ; sys_mmap
-    mov     rdx, 7                  ; prot  (RWE)
-    mov     r10, 0x22               ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
-    xor     r8, r8                  ; fd    (ignored)
-    xor     r9, r9                  ; off   (ignored)
-    syscall
-
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   munmap
-;
-; Description:
-;   Setup and make sys_munmap call
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-address
-;   rsi-length
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
-;
-munmap:
-    mov     rax, 0xb                ; sys_munmap
-    syscall
-
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   xor_copy
-;
-; Description:
-;   for i bytes in count:
-;       dst[i] = (src[i] ^ xor_val)
-;
-;   xor value must be <255
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-dst
-;   rsi-src
-;   rdx-len
-;   r8 -xor value
-;
-; Out:
-;   -
-;
-; Modifies:
-;   rax
-;   rcx
-;
-xor_copy:
-    mov     rcx, rdx
-    mov     rdx, r8
-    jmp     .begin
-.loop:
-    add     rsi, 1
-    add     rdi, 1
-.begin:
-    mov     al, [rsi]
-    xor     al, dl
-    mov     [rdi], al
-    dec     rcx
-    test    rcx, rcx
-    jnz     .loop
-
-    ret
 
 ;------------------------------------------------------------------------------
 ; Name:
@@ -422,7 +200,6 @@ userland_exec:
 ;   rsi
 ;
 ; Calls:
-;   get_phdr_info
 ;   mmap
 ;
 load_elf:
@@ -448,14 +225,12 @@ load_elf:
     push    rbx
 
     mov     rdi, rsi                ; phdr addr
-    call    get_phdr_info
+    get_phdr_virt_info rdi, rax, rdx
 
     push    rsi
     push    rcx
 
-    mov     rdi, rax                ; p_vaddr
-    mov     rsi, rbx                ; p_memsz
-    call    mmap                    ; mmap
+    mmap rax, rdx
 
     pop     rcx
     pop     rsi
@@ -475,34 +250,36 @@ load_elf:
 ;   rdx-number of phdr
 ;   r8 -base addr.. TODO tidy
 ;
+; Modifies:
+;   r12
+;
 load_interp:
     push    rbp
     mov     rbp, rsp
+    push    r12
 
 
     mov     rbx, rsi
-    mov     rsi, rdi
+    mov     r12, rdi
     mov     rcx, rdx
 
     jmp     .begin
 .loop:
-    add     rsi, rbx
+    add     r12, rbx
     dec     rcx
 
     test    rcx, rcx
     jz      .end
 .begin:
     xor     rax, rax
-    mov     eax, [rsi]              ; p_type
+    mov     eax, [r12]              ; p_type
     cmp     eax, 3                  ; PT_INTERP
     jne     .loop
 .end:
 
-    mov     rdx, [rsi + 0x8]        ; p_offset
-    mov     rbx, [rsi + 0x20]       ; p_filesz
+    get_phdr_phys_info rsi, rdi, rsi
 
-
-    sub     rsp, rbx                ; create space on stack
+    sub     rsp, rdx                ; create space on stack
 
     ; zero out
     xor     rax, rax
@@ -531,9 +308,7 @@ load_interp:
 
     push    rax                     ; fsize
 
-    mov     rdi, INTERP_SCRATCHPAD
-    mov     rsi, rax                ; fsize
-    call    mmap
+    mmap INTERP_SCRATCHPAD, rax
 
     mov     rax, 0                  ; sys_read
     pop     rdx                     ; count
@@ -574,14 +349,12 @@ load_interp:
     push    rdx
 
     mov     rdi, rsi                ; phdr addr
-    call    get_phdr_info
+    get_phdr_virt_info rdi, rax, rdx
 
     push    rsi
     push    rcx
 
-    mov     rdi, rax                ; p_vaddr
-    mov     rsi, rbx                ; p_memsz
-    call    mmap                    ; mmap
+    mmap rax, rdx
 
     pop     rcx
     pop     rsi
@@ -592,6 +365,7 @@ load_interp:
 
 .end1:
 
+    pop     r12
     mov     rsp, rbp
     pop     rbp
     ret

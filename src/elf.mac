@@ -1,0 +1,37 @@
+;------------------------------------------------------------------------------
+; Name:
+;   get_phdr_virt_info
+;
+; Description:
+;   Get p_vaddr and p_memsz
+;
+; In:
+;   1-phdr addr
+;
+; Out:
+;   2-p_vaddr
+;   3-p_memsz
+;
+%macro get_phdr_virt_info 3
+    mov     %2, [%1 + 0x10]       ; p_vaddr
+    mov     %3, [%1 + 0x28]       ; p_memsz
+%endmacro
+
+;------------------------------------------------------------------------------
+; Name:
+;   get_phdr_phys_info
+;
+; Description:
+;   Get p_offset and p_filesz
+;
+; In:
+;   1-phdr addr
+;
+; Out:
+;   2-p_offset
+;   3-p_filesz
+;
+%macro get_phdr_phys_info 3
+    mov     %2, [%1 + 0x8]        ; p_offset
+    mov     %2, [%1 + 0x20]       ; p_filesz
+%endmacro

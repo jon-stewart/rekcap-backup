@@ -32,6 +32,6 @@
 *.dSYM/
 *.su
 
-extract
+stub.bin
 
 __pycache__

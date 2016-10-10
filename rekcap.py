@@ -32,7 +32,7 @@ def xor_data(fdata):
     return (struct.pack("%dB" % len(out), *out))
 
 
-extract_stub = read_file("extract")
+extract_stub = read_file("stub.bin")
 
 binary = xor_data(read_file("example"))
 
