@@ -518,24 +518,104 @@ load_interp:
     rep     movsb
 
 
-    ; TODO probably need to fstat the file to know size to read
-
-    mov     rdi, INTERP_SCRATCHPAD
-    mov     rsi, 0?
-    call    mmap
-
     mov     rax, 2                  ; sys_open
     mov     rdi, rsp                ; filename
-    mov     rsi, 0                  ; flags
-    mov     rdx, 0                  ; mode
+    xor     rsi, rsi                ; flags
+    xor     rdx, rdx                ; mode
     syscall
+
+    push    rax                     ; fd
+
+    mov     rdi, rax
+    call    fstat_filesz
+
+    push    rax                     ; fsize
+
+    mov     rdi, INTERP_SCRATCHPAD
+    mov     rsi, rax                ; fsize
+    call    mmap
 
     mov     rax, 0                  ; sys_read
-    mov     rdi, rax                ; fd
-    mov     rsi, ?                  ; buf
-    mov     rdx, 0                  ; count
+    pop     rdx                     ; count
+    pop     rdi                     ; fd
+    mov     rsi, INTERP_SCRATCHPAD  ; buf
     syscall
 
+
+    ; get e_entry
+    mov     rsi, INTERP_SCRATCHPAD
+    mov     r13, [rsi + 0x18]       ; e_entry
+
+    ; mmap each PT_LOAD
+    mov     rbx, [rsi + 0x20]       ; e_phoff
+
+    xor     rdx, rdx
+    mov     dl,  [rsi + 0x36]       ; e_phent
+
+    xor     rcx, rcx
+    mov     cl,  [rsi + 0x38]       ; e_phnum
+
+    lea     rsi, [rsi + rbx]        ; phdr addr
+
+    jmp     .begin1
+.loop1:
+    add     rsi, rdx
+    dec     rcx
+
+    test    rcx, rcx
+    jz      .end1
+.begin1:
+    xor     rax, rax
+    mov     eax, [rsi]              ; p_type
+    cmp     eax, 1                  ; PT_LOAD
+    jne     .loop1
+
+
+    push    rdx
+
+    mov     rdi, rsi                ; phdr addr
+    call    get_phdr_info
+
+    push    rsi
+    push    rcx
+
+    mov     rdi, rax                ; p_vaddr
+    mov     rsi, rbx                ; p_memsz
+    call    mmap                    ; mmap
+
+    pop     rcx
+    pop     rsi
+    pop     rdx
+
+    jmp     .loop1
+
+
+.end1:
+
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   fstat_filesz
+;
+; In:
+;   rdi-fd
+;
+; Out:
+;   rax-file size
+fstat_filesz:
+    push    rbp
+    mov     rbp, rsp
+
+    sub     rsp, 144                ; sizeof struct stat
+
+    mov     rax, 5                  ; sys_fstat
+    mov     rsi, rsp                ; statbuf
+    syscall
+
+    mov     rax, [rsp + 48]         ; st_size
 
     mov     rsp, rbp
     pop     rbp
