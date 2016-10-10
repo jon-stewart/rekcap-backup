@@ -1,4 +1,4 @@
-GLOBAL extract_elf, load_elf, find_interp
+GLOBAL extract_elf, load_elf, find_interp, read_interp, load_interp, update_auxv
 
 EXTERN _mmap, _munmap, open, read, _fstat
 
@@ -282,49 +282,75 @@ read_interp:
     pop     rbp
     ret
 
+;------------------------------------------------------------------------------
+; Name:
+;   load_interp
+;
 ; Description:
-;   Traverse elf headers and find the PT_INTERP and PT_LOAD phdrs.
+;   Iterate through the interpreter elf headers and mmap the PT_LOAD segments.
 ;
-;   For each PT_LOAD: mmap.
+; Stack:
+;   [rbp-0x8] : e_entry
 ;
-;   Read in interpreter to the interp scratch pad.  For each PT_LOAD: mmap.
+; In:
+;   rdi-interp elf base addr
 ;
-;   Munmap the interp scratch pad.
+; Out:
+;   rax-interp e_entry
 ;
-;   Change values of the AUXV on stack to reflect new elf.
+; Modifies:
+;   rax
 ;
-;   Return interpeter e_entry point.  Caller mus
-;userland_exec:
-;    push    rbp
-;    mov     rbp, rsp
-;    sub     rsp, 0x20
+load_interp:
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 8
+    push    rsi
+    push    rbx
+    push    rcx
+
+    mov     rax, [rdi + 0x18]         ; e_entry
+    mov     [rbp-0x8], rax
+
+    mov     rsi, [rdi + 0x20]         ; e_phoff
+    lea     rsi, [rdi + rsi]          ; phdr addr
+
+    xor     rbx, rbx
+    mov     bl, [rdi + 0x36]         ; e_phent
+
+    xor     rcx, rcx
+    mov     cl, [rdi + 0x38]         ; e_phnum
+
+    jmp     .begin
+.loop:
+    add     rsi, rbx
+    dec     rcx
+
+    test    rcx, rcx
+    jz      .end
+.begin:
+    xor     rax, rax
+    mov     eax, [rsi]              ; p_type
+    cmp     eax, 1                  ; PT_LOAD
+    jne     .loop
+
+    phdr_virt_info rsi, rbx, rcx
+
+    mmap    rbx, rcx
+
+    jmp     .loop
+.end:
+
+    pop     rcx
+    pop     rbx
+    pop     rsi
+    pop     rax                     ; return e_entry
+    pop     rbp
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
+;   update_auxv
 ;
-;    mov     [rbp-0x8], rdi
-;
-;    mov     rax, [rdi + 0x20]       ; e_phoff
-;    lea     rbx, [rdi + rax]        ; phdr addr
-;    mov     [rbp-0x8], rbx
-;
-;    xor     rax, rax
-;    mov     al, [rdi + 0x36]        ; e_phent
-;    mov     [rbp-0x10], rax
-;
-;    xor     rax, rax
-;    mov     al, [rdi + 0x38]        ; e_phnum
-;    mov     [rbp-0x18], rax
-;
-;
-;    mov     rdi, [rbp-0x8]          ; phdr addr
-;    mov     rsi, [rbp-0x10]         ; e_phent
-;    mov     rdx, [rbp-0x18]         ; e_phnum
-;    call    load_elf
-;
-;    mov     rdi, [rbp-0x8]          ; phdr addr
-;    mov     rsi, [rbp-0x10]         ; e_phent
-;    mov     rdx, [rbp-0x18]         ; e_phnum
-;    mov     r8,  [rbp-0x20]
-;    call    load_interp
-;
-;    mov     rsp, rbp
-;    pop     rbp
-;    ret
+update_auxv:
+

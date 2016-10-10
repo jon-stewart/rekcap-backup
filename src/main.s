@@ -18,8 +18,8 @@
 ; elf.s
 EXTERN find_auxv, get_auxv_val, set_auxv_val
 
-; extract.s
-EXTERN extract_elf, load_elf, cleanup_elf_scratchpad
+; user_exec.s
+EXTERN extract_elf, load_elf, find_interp, read_interp, load_interp, update_auxv
 
 ; syscalls.s
 EXTERN _mmap, _munmap
@@ -80,6 +80,7 @@ delta:
 
     mov     [rbp-0x18], rax         ; interp scratchpad size
 
+    call    load_interp
 
 
     munmap  ELF_SCRATCHPAD, [rbp-0x10]
@@ -104,87 +105,3 @@ msg_start_sz:   equ $-msg_start
 
 msg_end:        db "end",10,0
 msg_end_sz:     equ $-msg_end
-
-
-;------------------------------------------------------------------------------
-; TODO Assuming there always PT_INTERP for now
-;
-; In:
-;   rdi-phdr addr
-;   rsi-phdr size
-;   rdx-number of phdr
-;   r8 -base addr.. TODO tidy
-;
-; Modifies:
-;   r12
-;
-load_interp:
-
-    push    rax                     ; fd
-
-    mov     rdi, rax
-    ; call    fstat_filesz
-
-    push    rax                     ; fsize
-
-    mmap INTERP_SCRATCHPAD, rax
-
-    mov     rax, 0                  ; sys_read
-    pop     rdx                     ; count
-    pop     rdi                     ; fd
-    mov     rsi, INTERP_SCRATCHPAD  ; buf
-    syscall
-
-
-    ; get e_entry
-    mov     rsi, INTERP_SCRATCHPAD
-    mov     r13, [rsi + 0x18]       ; e_entry
-
-    ; mmap each PT_LOAD
-    mov     rbx, [rsi + 0x20]       ; e_phoff
-
-    xor     rdx, rdx
-    mov     dl,  [rsi + 0x36]       ; e_phent
-
-    xor     rcx, rcx
-    mov     cl,  [rsi + 0x38]       ; e_phnum
-
-    lea     rsi, [rsi + rbx]        ; phdr addr
-
-    jmp     .begin1
-.loop1:
-    add     rsi, rdx
-    dec     rcx
-
-    test    rcx, rcx
-    jz      .end1
-.begin1:
-    xor     rax, rax
-    mov     eax, [rsi]              ; p_type
-    cmp     eax, 1                  ; PT_LOAD
-    jne     .loop1
-
-
-    push    rdx
-
-    mov     rdi, rsi                ; phdr addr
-    phdr_virt_info rdi, rax, rdx
-
-    push    rsi
-    push    rcx
-
-    mmap rax, rdx
-
-    pop     rcx
-    pop     rsi
-    pop     rdx
-
-    jmp     .loop1
-
-
-.end1:
-
-    pop     r12
-    mov     rsp, rbp
-    pop     rbp
-    ret
