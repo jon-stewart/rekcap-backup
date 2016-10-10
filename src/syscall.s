@@ -9,6 +9,8 @@ GLOBAL _mmap, _munmap, open, read, _fstat
 ;
 ;   Setup and make sys_mmap call.
 ;
+;   mmap doesn't restore register values.
+;
 ; Stack:
 ;   rdx
 ;   r8
@@ -32,6 +34,11 @@ _mmap:
     push    r8
     push    r9
     push    r10
+    push    r11
+    push    r12
+    push    r13
+    push    r14
+    push    r15
 
     mov     rax, 9                  ; sys_mmap
     mov     rdx, 7                  ; prot  (RWE)
@@ -40,6 +47,11 @@ _mmap:
     xor     r9, r9                  ; off   (ignored)
     syscall
 
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     r11
     pop     r10
     pop     r9
     pop     r8

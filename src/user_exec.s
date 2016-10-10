@@ -133,6 +133,10 @@ load_elf:
     push    rsi
     push    rbx
     push    rcx
+    push    r12
+    push    r13
+    push    r14
+    push    r15
 
     mov     rax, [rdi + 0x20]       ; e_phoff
     lea     rsi, [rdi + rax]        ; phdr addr
@@ -158,11 +162,22 @@ load_elf:
 
     phdr_virt_info rsi, r12, r13
 
+    phdr_phys_info rsi, r14, r15
+
     mmap    r12, r13
+
+    mov     rdi, r12
+    mov     rsi, r14
+    mov     rcx, r13
+    rep     movsb                   ; copy data into new segment
 
     jmp     .loop
 .end:
 
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
     pop     rcx
     pop     rbx
     pop     rsi
@@ -292,6 +307,14 @@ read_interp:
 ;
 ; Stack:
 ;   [rbp-0x8] : e_entry
+;   rdi
+;   rsi
+;   rbx
+;   rcx
+;   r12
+;   r13
+;   r14
+;   r15
 ;
 ; In:
 ;   rdi-interp elf base addr
@@ -306,9 +329,14 @@ load_interp:
     push    rbp
     mov     rbp, rsp
     sub     rsp, 8
+    push    rdi
     push    rsi
     push    rbx
     push    rcx
+    push    r12
+    push    r13
+    push    r14
+    push    r15
 
     mov     rax, [rdi + 0x18]         ; e_entry
     mov     [rbp-0x8], rax
@@ -335,16 +363,28 @@ load_interp:
     cmp     eax, 1                  ; PT_LOAD
     jne     .loop
 
-    phdr_virt_info rsi, rbx, rcx
+    phdr_virt_info rsi, r12, r13
 
-    mmap    rbx, rcx
+    phdr_phys_info rsi, r14, r15
+
+    mmap    r12, r13
+
+    mov     rdi, r12
+    mov     rsi, r14
+    mov     rcx, r13
+    rep     movsb                   ; copy data into segment
 
     jmp     .loop
 .end:
 
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
     pop     rcx
     pop     rbx
     pop     rsi
+    pop     rdi
     pop     rax                     ; return e_entry
     pop     rbp
     ret
