@@ -15,7 +15,7 @@ Unpacking:
 
     * Traverse stack to AUXV
     * Extract elf program header info from AUXV
-    * mmap(exec|write) to original elf base address (0x400000)
+    * mmap(exec|write) to elf scratch pad
     * XOR original elf from segment into newly mapped memory
     * Foreach PT_LOAD segment in original elf : mmap and memcpy
     * Get PT_INTERP segment in original elf, path to ld-linux
