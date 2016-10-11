@@ -347,6 +347,8 @@ read_interp:
 ; Modifies:
 ;   rax
 ;
+; TODO:  need rounding down/up of vaddr/length
+;
 load_interp:
     push    rbp
     mov     rbp, rsp
@@ -366,6 +368,7 @@ load_interp:
     mov     [rbp-0x10], rdi
 
     mov     rax, [rdi + 0x18]         ; e_entry
+    add     rax, 0x6000000              ; TODO hard coded for speed.  p_entry + base load address
     mov     [rbp-0x8], rax
 
     mov     rsi, [rdi + 0x20]         ; e_phoff
@@ -392,14 +395,18 @@ load_interp:
 
     phdr_virt_info rsi, r12, r13
 
+                                    ; TODO if E_TYPE ET_DYN
     test    r12, r12                ; ld-linux is DYN of course! pick some random address
     jnz     .hop
     mov     r12, 0x6000000          ; TODO tidy hardcoded!
+    jmp     .out
 .hop:
+    add     r13, 0xba0              ; TODO HACK : if vaddr round down..
+.out:
 
     phdr_phys_info rsi, r14, r15
 
-    add     r14, rdi                ; add base addr to p_offset
+    add     r14, [rbp-0x10]         ; add base addr to p_offset
 
     push    rsi
     push    rcx
@@ -441,6 +448,7 @@ load_interp:
 ; Stack:
 ;   rsi
 ;   rbx
+;   rcx
 ;
 ; In:
 ;   rdi-base addr of auxv
@@ -450,29 +458,31 @@ load_interp:
 update_auxv:
     push    rsi
     push    rbx
+    push    rcx
 
-    mov     rax, rsi                ; elf base addr
-    mov     rbx, rdx                ; interp e_entry
+    mov     rbx, rsi                ; elf base addr
+    mov     rcx, rdx                ; interp e_entry
 
     mov     rsi, 3                  ; AT_PHDR (3)
-    mov     rdx, [rax + 0x20]       ; e_phoff
+    mov     rdx, [rbx + 0x20]       ; e_phoff
     call    set_auxv_val
 
     mov     rsi, 4                  ; AT_PHENT
     xor     rdx, rdx
-    mov     dl, [rax + 0x36]        ; e_phent
+    mov     dl, [rbx + 0x36]        ; e_phent
     call    set_auxv_val
 
     mov     rsi, 5                  ; AT_PHNUM
     xor     rdx, rdx
-    mov     dl, [rax + 0x38]        ; e_phnum
+    mov     dl, [rbx + 0x38]        ; e_phnum
 
     mov     rsi, 7                  ; AT_BASE
-    mov     rdx, rbx                ; interp e_entry  TODO REALLY?
+    mov     rdx, rcx                ; interp e_entry  TODO REALLY?
 
     mov     rsi, 9                  ; AT_ENTRY
-    mov     rdx, [rax + 0x18]       ; elf e_entry
+    mov     rdx, [rbx + 0x18]       ; elf e_entry
 
+    pop     rcx
     pop     rbx
     pop     rsi
     ret

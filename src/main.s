@@ -36,7 +36,7 @@ EXTERN _mmap, _munmap
 ; [rbp-0x10] : auxv addr
 ; [rbp-0x18] : elf scratchpad size
 ; [rbp-0x20] : interp scratchpad size
-; [rbp-0x28] : interp e_entry
+; [rbp-0x28] : interp e_entry TODO  needs be DYN address loaded to
 
 global _start
 
@@ -93,9 +93,9 @@ delta:
     mov     rdx, 0x6000000          ; interp .text dyn address TODO tidy
     call    update_auxv
 
-    munmap  ELF_SCRATCHPAD, [rbp-0x10]
+    munmap  ELF_SCRATCHPAD, [rbp-0x18]
 
-    munmap  INTERP_SCRATCHPAD, [rbp-0x18]
+    munmap  INTERP_SCRATCHPAD, [rbp-0x20]
 
     print   [rbp-8], msg_end, msg_end_sz
 
