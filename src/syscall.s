@@ -1,171 +1,140 @@
-GLOBAL _mmap, _munmap, open, read, _fstat
+
+global _print, _open, _mmap, _exit
+
+
+;------------------------------------------------------------------------------
+; Name:
+;   _print
+;
+; Description:
+;   sys_write syscall buffer to stdout
+;
+; In:
+;   rdi - buffer
+;   rsi - len
+;
+; Out:
+;   rax - retval
+;
+; Modifies:
+;   rdi
+;   rsi
+;
+_print:
+    push    rbp
+    mov     rbp, rsp
+
+	push	rdx
+    push    rsi
+    push    rdi
+
+    mov     rax, 1          ; sys_write
+    mov     rdi, 1          ; stdout
+    pop     rsi             ; buffer
+    pop     rdx             ; len
+    syscall
+
+	pop		rdx
+
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+
+;------------------------------------------------------------------------------
+; Name:
+;   _open
+;
+; Description:
+;   setup and make sys_open call
+;
+; In:
+;   rdi - filename
+;
+; Out:
+;   rax - retval
+;
+_open:
+	push	rbp
+	mov		rbp, rsp
+
+	push	rsi
+	push	rdx
+
+    mov     rax, 2          ; sys_open
+    xor     rsi, rsi        ; flags
+    xor     rdx, rdx        ; mode
+    syscall
+
+	pop		rdx
+	pop		rsi
+
+	mov		rsp, rbp
+	pop		rbp
+    ret
+
+
+;------------------------------------------------------------------------------
+; Name:
+;   _read
+;
+; Description:
+;   setup and make sys_read call.
+;
+; In:
+;   rdi - fd
+;   rsi - buf
+;   rdx - count
+;
+; Out:
+;   rax - retval
+;
+_read:
+    mov     rax, 0          ; sys_read
+    syscall
+
+    ret
+
 
 ;------------------------------------------------------------------------------
 ; Name:
 ;   _mmap
 ;
 ; Description:
-;   Call via macro.
+;   setup and make sys_mmap call
 ;
-;   Setup and make sys_mmap call.
+;   mmap doesn't restore register values (?)
 ;
-;   mmap doesn't restore register values.
+; In:
+;   rdi - address
+;   rsi - length
 ;
-; Stack:
+; Out:
+;   rax - retval
+;
+; Modifies:
 ;   rdx
+;   r10
 ;   r8
 ;   r9
-;   r10
-;
-; In:
-;   rdi-address
-;   rsi-length
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
 ;
 _mmap:
-    push    rbx
-    push    rcx
-    push    rdx
-    push    r8
-    push    r9
-    push    r10
-    push    r11
-    push    r12
-    push    r13
-    push    r14
-    push    r15
-
-    mov     rax, 9                  ; sys_mmap
-    mov     rdx, 7                  ; prot  (RWE)
-    mov     r10, 0x22               ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
-    xor     r8, r8                  ; fd    (ignored)
-    xor     r9, r9                  ; off   (ignored)
-    syscall
-
-    pop     r15
-    pop     r14
-    pop     r13
-    pop     r12
-    pop     r11
-    pop     r10
-    pop     r9
-    pop     r8
-    pop     rdx
-    pop     rcx
-    pop     rbx
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   _munmap
-;
-; Description:
-;   Call via macro.
-;
-;   Setup and make sys_munmap call.
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-address
-;   rsi-length
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
-;
-_munmap:
-    mov     rax, 0xb                ; sys_munmap
+	mov		rax, 9			; sys_mmap
+	mov     rdx, 7          ; prot  (RWE)
+    mov     r10, 34         ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
+    xor     r8, r8          ; fd    (ignore)
+    xor     r9, r9          ; off   (ignore)
     syscall
 
     ret
 
 ;------------------------------------------------------------------------------
 ; Name:
-;   open
+;   _exit
 ;
 ; Description:
-;   Setup and make sys_open call
+;   clean program exit
 ;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-filename
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
-;   rdx
-;
-open:
-    push    rsi
-
-    mov     rax, 2                  ; sys_open
-    xor     rsi, rsi                ; flags
-    xor     rdx, rdx                ; mode
+_exit:
+    mov     rax, 60         ; sys_exit
     syscall
-
-    pop     rsi
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   read
-;
-; Description:
-;   Setup and make sys_read call.
-;
-; Stack:
-;   Nothing
-;
-; In:
-;   rdi-fd
-;   rsi-buf
-;   rdx-count
-;
-; Out:
-;   rax-error
-;
-; Modifies:
-;   rax
-;
-read:
-    mov     rax, 0                  ; sys_read
-    syscall
-
-    ret
-
-;------------------------------------------------------------------------------
-; Name:
-;   _fstat
-;
-; Description:
-;   Call via macro.
-;
-;   Setup and make sys_fstat call.
-;
-; Stack:
-;   struct stat buf
-;
-; In:
-;   rdi-struct stat buf
-;
-; Out:
-;   rax-error
-;
-_fstat:
-    mov     rax, 5                  ; sys_fstat
-    syscall
-
-    ret
