@@ -108,22 +108,22 @@ _read:
 ; In:
 ;   rdi - address
 ;   rsi - length
+;   rdx - offset
 ;
 ; Out:
 ;   rax - retval
 ;
 ; Modifies:
-;   rdx
 ;   r10
 ;   r8
 ;   r9
 ;
 _mmap:
 	mov		rax, 9			; sys_mmap
+    mov     r9,  rdx        ; off
 	mov     rdx, 7          ; prot  (RWE)
     mov     r10, 34         ; flags (MAP_ANONYMOUS | MAP_PRIVATE)
-    xor     r8, r8          ; fd    (ignore)
-    xor     r9, r9          ; off   (ignore)
+    xor     r8,  r8         ; fd    (ignore)
     syscall
 
     ret
