@@ -1,0 +1,67 @@
+;------------------------------------------------------------------------------
+; Name:
+;   print
+;
+; Description:
+;   Write string to stdout
+;
+; In:
+;   1-code base addr
+;   2-string offset
+;   3-string length
+;
+%macro print 3
+    mov     rax, 1                  ; sys_write
+    mov     rdi, 1                  ; stdout
+    mov     rdx, %1
+    lea     rsi, [rdx + %2]         ; buf
+    mov     rdx, %3                 ; count
+    syscall
+%endmacro
+
+;------------------------------------------------------------------------------
+; Name:
+;   mmap
+;
+; In:
+;   1-addr
+;   2-size
+;
+%macro mmap 2
+    mov     rdi, %1
+    mov     rsi, %2
+    call    _mmap
+%endmacro
+
+;------------------------------------------------------------------------------
+; Name:
+;   munmap
+;
+; In:
+;   1-addr
+;   2-size
+;
+%macro munmap 2
+    mov     rdi, %1
+    mov     rsi, %2
+    call    _munmap
+%endmacro
+
+;------------------------------------------------------------------------------
+; Name:
+;   fstat_filesz
+;
+; In:
+;   1-fd
+;
+%macro fstat_filesz 1
+    sub     rsp, 144                ; sizeof (struct stat)
+
+    mov     rdi, %1
+    mov     rsi, rsp
+    call    _fstat
+
+    mov     rax, [rsp + 48]         ; st_size
+
+    add     rsp, 144
+%endmacro
