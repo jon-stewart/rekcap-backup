@@ -1,5 +1,5 @@
 
-global _print, _open, _mmap, _exit
+global _print, _open, _fstat_size, _read, _mmap, _munmap, _exit
 
 
 ;------------------------------------------------------------------------------
@@ -40,6 +40,36 @@ _print:
     pop     rbp
     ret
 
+;------------------------------------------------------------------------------
+; Name:
+;   _fstat_size
+;
+; Description:
+;   Setup and pass local struct stat to fstat syscall.
+;
+;   Return the st_size.
+;
+; In:
+;   rdi - fd
+;
+; Out:
+;   rax - retval
+;
+_fstat_size:
+    push    rbp
+    mov     rbp, rsp
+
+    sub     rsp, 144        ; sizeof (struct stat)
+
+    mov     rax, 5          ; sys_fstat
+    mov     rsi, rsp        ; struct stat
+    syscall
+
+    mov     rax, [rsp + 48] ; st_size
+
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
 ;------------------------------------------------------------------------------
 ; Name:
@@ -92,7 +122,6 @@ _open:
 _read:
     mov     rax, 0          ; sys_read
     syscall
-
     ret
 
 
@@ -130,6 +159,22 @@ _mmap:
 
 ;------------------------------------------------------------------------------
 ; Name:
+;   _munmap
+;
+; Description:
+;   unmap region of memory
+;
+; In:
+;   rdi - address
+;   rsi - length
+;
+_munmap:
+    mov     rax, 11         ; sys_munmap
+    syscall
+    ret
+
+;------------------------------------------------------------------------------
+; Name:
 ;   _exit
 ;
 ; Description:
@@ -137,4 +182,5 @@ _mmap:
 ;
 _exit:
     mov     rax, 60         ; sys_exit
+    xor     rdi, rdi        ; error_code
     syscall
